@@ -237,10 +237,21 @@ def _validate_config_data(data: Optional[Dict]) -> Tuple[Optional[Dict], Optiona
         "tv_show_mode",
         "auto_load_plugins",
         "enable_ai_completion",
+        "enable_chinese_conversion",
     ]:
         val = data.get(field_name)
         if val is not None:
             validated[field_name] = bool(val)
+    
+    # 中文转换目标
+    chinese_target = data.get("chinese_conversion_target")
+    if chinese_target is not None:
+        sval = str(chinese_target).strip()
+        allowed_targets = {"zh-cn", "zh-tw", "zh-hk", "zh-sg", "zh-mo"}
+        if sval not in allowed_targets:
+            errors.append(f"chinese_conversion_target 必须是 {allowed_targets} 之一")
+        else:
+            validated["chinese_conversion_target"] = sval
 
     # 字符串字段
     for field_name in [
@@ -629,6 +640,12 @@ INDEX_HTML = r"""<!DOCTYPE html>
                         <label><input type="checkbox" id="cfgAutoLoadPlugins"> 自动加载插件</label>
                     </div>
                 </div>
+                
+                <div class="card">
+                    <div class="card-header"><h2>🌏 中文转换</h2></div>
+                    <div class="form-group"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="cfgChineseConvert"> 启用中文简繁转换</label><div class="help-text">自动转换元数据中的中文文本</div></div>
+                    <div class="form-group"><label>转换目标</label><select class="form-control" id="cfgChineseTarget"><option value="zh-cn">简体中文 (zh-cn)</option><option value="zh-tw">繁体中文 (zh-tw)</option><option value="zh-hk">繁体中文 (zh-hk)</option><option value="zh-sg">简体中文 (zh-sg)</option></select></div>
+                </div>
 
                 <div class="card">
                     <div class="card-header"><h2>插件配置</h2></div>
@@ -810,9 +827,9 @@ INDEX_HTML = r"""<!DOCTYPE html>
         async function refreshDashboard(){try{const data=await api('/api/status');const p=data.progress||{};document.getElementById('statTotal').textContent=p.total||0;document.getElementById('statProcessed').textContent=p.completed||0;document.getElementById('statSuccess').textContent=p.success||0;document.getElementById('statFailed').textContent=p.failed||0;document.getElementById('statSkipped').textContent=p.skipped||0;const rate=p.total>0?((p.success/p.total)*100).toFixed(1):'0';document.getElementById('statRate').textContent=rate+'%';const pct=p.total>0?((p.completed/p.total)*100):0;document.getElementById('progressBar').style.width=pct+'%';document.getElementById('progressPercent').textContent=Math.round(pct)+'%';document.getElementById('progressText').textContent=p.total>0?p.completed+' / '+p.total:'等待开始...';document.getElementById('progressDetail').textContent=p.current_file?'当前: '+escHtml(p.current_file):'';const dot=document.getElementById('statusDot');const txt=document.getElementById('statusText');if(data.is_running){dot.className='status-dot running';txt.textContent='运行中'}else{dot.className='status-dot idle';txt.textContent='就绪'}if(_wasRunning&&!data.is_running){showToast('转换已完成！','success');document.getElementById('btnStart').style.display='';document.getElementById('btnStop').style.display='none'}_wasRunning=!!data.is_running;if(data.recent_files&&data.recent_files.length>0){const tbody=document.getElementById('recentFiles');tbody.innerHTML=data.recent_files.map(f=>{const cls=f.result==='success'?'success':f.result==='error'?'danger':'warning';return '<tr><td>'+escHtml(f.file)+'</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(f.dir)+'</td><td><span class="badge '+cls+'">'+escHtml(f.result)+'</span></td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(f.error||'')+'</td><td style="color:var(--text-muted)">'+escHtml(f.time||'')+'</td></tr>'}).join('')}}catch(e){console.error(e)}}
 
         // === 配置 ===
-        const CFG_FIELDS={cfgDirectory:'directory',cfgWorkers:'max_workers',cfgMode:'process_mode',cfgMaxImgSize:'max_image_size_kb',cfgCompression:'image_compression_ratio',cfgRetries:'retry_attempts',cfgRetryDelay:'retry_delay',cfgInclude:'file_include_patterns',cfgExclude:'file_exclude_patterns',cfgRegex:'file_regex',cfgFormats:'output_formats',cfgMinSize:'min_size',cfgMaxSize:'max_size',cfgNfoExt:'nfo_extensions',cfgVideoExt:'video_extensions',cfgVsmetaExt:'vsmeta_extension',cfgBackupDir:'backup_dir',cfgCheckpointFile:'checkpoint_file',cfgReportDir:'report_output_dir',cfgImgCacheSize:'image_cache_max_size',cfgCheckpointInterval:'checkpoint_save_interval',cfgLogLevel:'log_level',cfgLogFile:'log_file',cfgLogFileMaxSize:'log_file_max_size',cfgLogFileBackupCount:'log_file_backup_count',cfgBackupMaxCount:'backup_max_count',cfgBackupMaxAge:'backup_max_age_days',cfgPluginDir:'plugin_dir',cfgAiKey:'ai_api_key',cfgAiUrl:'ai_api_url'};
+        const CFG_FIELDS={cfgDirectory:'directory',cfgWorkers:'max_workers',cfgMode:'process_mode',cfgMaxImgSize:'max_image_size_kb',cfgCompression:'image_compression_ratio',cfgRetries:'retry_attempts',cfgRetryDelay:'retry_delay',cfgInclude:'file_include_patterns',cfgExclude:'file_exclude_patterns',cfgRegex:'file_regex',cfgFormats:'output_formats',cfgMinSize:'min_size',cfgMaxSize:'max_size',cfgNfoExt:'nfo_extensions',cfgVideoExt:'video_extensions',cfgVsmetaExt:'vsmeta_extension',cfgBackupDir:'backup_dir',cfgCheckpointFile:'checkpoint_file',cfgReportDir:'report_output_dir',cfgImgCacheSize:'image_cache_max_size',cfgCheckpointInterval:'checkpoint_save_interval',cfgLogLevel:'log_level',cfgLogFile:'log_file',cfgLogFileMaxSize:'log_file_max_size',cfgLogFileBackupCount:'log_file_backup_count',cfgBackupMaxCount:'backup_max_count',cfgBackupMaxAge:'backup_max_age_days',cfgPluginDir:'plugin_dir',cfgAiKey:'ai_api_key',cfgAiUrl:'ai_api_url',cfgChineseTarget:'chinese_conversion_target'};
         const LIST_FIELDS=new Set(['file_include_patterns','file_exclude_patterns','output_formats','nfo_extensions','video_extensions']);
-        const BOOL_FIELDS={cfgOverwrite:'overwrite_existing',cfgBackup:'enable_backup',cfgDeleteVsmeta:'delete_existing_vsmeta',cfgDryRun:'dry_run',cfgTvShow:'tv_show_mode',cfgAutoLoadPlugins:'auto_load_plugins',cfgAiEnable:'enable_ai_completion'};
+        const BOOL_FIELDS={cfgOverwrite:'overwrite_existing',cfgBackup:'enable_backup',cfgDeleteVsmeta:'delete_existing_vsmeta',cfgDryRun:'dry_run',cfgTvShow:'tv_show_mode',cfgAutoLoadPlugins:'auto_load_plugins',cfgAiEnable:'enable_ai_completion',cfgChineseConvert:'enable_chinese_conversion'};
         const NUM_FIELDS=new Set(['max_workers','max_image_size_kb','retry_attempts','retry_delay','image_compression_ratio','min_size','max_size','log_file_max_size','log_file_backup_count','backup_max_count','backup_max_age_days','image_cache_max_size','checkpoint_save_interval']);
 
         async function loadConfig(){try{const data=await api('/api/config');const c=data.config||{};for(const[elId,field]of Object.entries(CFG_FIELDS)){const el=document.getElementById(elId);if(!el)continue;const v=c[field];if(v===undefined||v===null)continue;if(LIST_FIELDS.has(field)){el.value=Array.isArray(v)?v.join(', '):''}else{el.value=v}}for(const[elId,field]of Object.entries(BOOL_FIELDS)){const el=document.getElementById(elId);if(el)el.checked=!!c[field]}showToast('配置已加载','info')}catch(e){showToast('加载失败: '+e.message,'error')}}
