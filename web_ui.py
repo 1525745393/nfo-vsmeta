@@ -491,6 +491,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
     <div class="app">
         <div class="toast-container" id="toastContainer"></div>
         <div id="modalContainer"></div>
+        <div id="fileDetailModal"></div>
         <nav class="navbar">
             <div class="navbar-brand">
                 <div class="logo">N</div>
@@ -507,6 +508,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
                 <button class="tab" data-tab="config" onclick="switchTab('config')">⚙️ 配置</button>
                 <button class="tab" data-tab="smart" onclick="switchTab('smart')">🤖 智能助手</button>
                 <button class="tab" data-tab="convert" onclick="switchTab('convert')">🚀 转换</button>
+                <button class="tab" data-tab="visual" onclick="switchTab('visual')">🎨 可视化对比</button>
                 <button class="tab" data-tab="tools" onclick="switchTab('tools')">🧰 工具箱</button>
                 <button class="tab" data-tab="report" onclick="switchTab('report')">📄 报告</button>
                 <button class="tab" data-tab="checkpoint" onclick="switchTab('checkpoint')">💾 断点</button>
@@ -705,8 +707,8 @@ INDEX_HTML = r"""<!DOCTYPE html>
                 <div class="card">
                     <div class="card-header"><h2>扫描结果 <span id="scanCount" style="font-size:12px;color:var(--text-muted)"></span></h2><div class="btn-group"><button class="btn btn-sm" onclick="selectAllFiles()">全选</button><button class="btn btn-sm" onclick="deselectAllFiles()">取消全选</button></div></div>
                     <div class="table-wrapper">
-                        <table><thead><tr><th><input type="checkbox" class="file-select" onchange="toggleSelectAll(this)"></th><th>#</th><th>文件名</th><th>目录</th><th>大小</th><th>NFO</th><th>状态</th></tr></thead>
-                        <tbody id="scanResults"><tr><td colspan="7" class="empty-state"><p>点击"开始转换"后显示扫描结果</p></td></tr></tbody></table>
+                        <table><thead><tr><th><input type="checkbox" class="file-select" onchange="toggleSelectAll(this)"></th><th>#</th><th>文件名</th><th>目录</th><th>大小</th><th>元数据</th><th>转换状态</th><th>操作</th></tr></thead>
+                        <tbody id="scanResults"><tr><td colspan="8" class="empty-state"><p>点击"开始转换"后显示扫描结果</p></td></tr></tbody></table>
                     </div>
                 </div>
             </div>
@@ -802,13 +804,47 @@ INDEX_HTML = r"""<!DOCTYPE html>
                     <button class="btn btn-primary" onclick="createPluginTemplate()">✨ 创建插件</button>
                 </div>
             </div>
+            
+            <!-- ========== 可视化对比 ========== -->
+            <div class="page" id="page-visual">
+                <div class="card" style="padding:10px;margin-bottom:10px">
+                    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+                        <div class="form-group" style="margin:0"><label>处理目录</label><input type="text" class="form-control" id="visualScanDir" value="." style="width:300px"></div>
+                        <button class="btn btn-primary" onclick="visualScanFiles()">🔍 扫描文件</button>
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="globalRollbackMode"> 全局回滚模式</label>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:300px 1fr 300px;gap:10px;height:calc(100vh - 250px);min-height:600px">
+                    <!-- 左侧文件树 -->
+                    <div class="card" style="display:flex;flex-direction:column;overflow:hidden">
+                        <div class="card-header" style="margin:0;padding:12px"><h2>📁 文件列表</h2></div>
+                        <div id="visualFileTree" style="flex:1;overflow:auto;padding:10px">
+                            <div class="empty-state"><div class="icon">📁</div><p>点击"扫描文件"开始</p></div>
+                        </div>
+                    </div>
+                    <!-- 中间元数据Diff -->
+                    <div class="card" style="display:flex;flex-direction:column;overflow:hidden">
+                        <div class="card-header" style="margin:0;padding:12px"><h2>🔄 元数据对比</h2></div>
+                        <div id="visualDiffView" style="flex:1;overflow:auto;padding:10px">
+                            <div class="empty-state"><div class="icon">📊</div><p>选择文件查看对比</p></div>
+                        </div>
+                    </div>
+                    <!-- 右侧实时监控 -->
+                    <div class="card" style="display:flex;flex-direction:column;overflow:hidden">
+                        <div class="card-header" style="margin:0;padding:12px"><h2>📡 实时监控</h2></div>
+                        <div id="visualMonitor" style="flex:1;overflow:auto;padding:10px;font-family:JetBrains Mono,monospace;font-size:12px">
+                            <div style="color:var(--text-muted)">等待监控数据...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
         let csrfToken='';const SAFE_LEVELS=new Set(['info','warning','error','success','debug']);
 
-        function switchTab(name){document.querySelectorAll('.tab').forEach(t=>{t.classList.toggle('active',t.dataset.tab===name)});document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));const page=document.getElementById('page-'+name);if(page)page.classList.add('active');if(name==='convert')refreshScanResults();if(name==='checkpoint')refreshCheckpoint();if(name==='backup')refreshBackups()}
+        function switchTab(name){document.querySelectorAll('.tab').forEach(t=>{t.classList.toggle('active',t.dataset.tab===name)});document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));const page=document.getElementById('page-'+name);if(page)page.classList.add('active');if(name==='convert')refreshScanResults();if(name==='checkpoint')refreshCheckpoint();if(name==='backup')refreshBackups();if(name==='visual'){startVisualMonitor()}}
 
         function showToast(message,type='info'){const c=document.getElementById('toastContainer');const icons={success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'};const t=document.createElement('div');t.className='toast toast-'+type;t.innerHTML='<span class="toast-icon">'+(icons[type]||'ℹ️')+'</span><span>'+escHtml(message)+'</span>';c.appendChild(t);setTimeout(()=>{if(t.parentNode)t.parentNode.removeChild(t)},3000)}
 
@@ -849,7 +885,11 @@ INDEX_HTML = r"""<!DOCTYPE html>
         async function stopConversion(){try{await api('/api/convert/stop','POST');document.getElementById('btnStart').style.display='';document.getElementById('btnStop').style.display='none';showToast('已发送停止信号','warning')}catch(e){showToast('停止失败: '+e.message,'error')}}
 
         // === 扫描结果 ===
-        async function refreshScanResults(){try{const data=await api('/api/scan-results');const tbody=document.getElementById('scanResults');const files=data.files||[];document.getElementById('scanCount').textContent=files.length?'共 '+files.length+' 个文件':'';if(files.length>0){tbody.innerHTML=files.map((f,i)=>'<tr><td><input type="checkbox" class="file-select" data-file="'+escHtml(f.directory+'/'+f.filename)+'" onchange="updateSelectedFiles()"></td><td>'+(i+1)+'</td><td>'+escHtml(f.filename)+'</td><td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(f.directory)+'</td><td>'+formatSize(f.size)+'</td><td><span class="badge '+(f.has_nfo?'success':'warning')+'">'+(f.has_nfo?'有NFO':'无NFO')+'</span></td><td>'+(f.selected?'<span class="badge info">已选</span>':'')+'</td></tr>').join('')}else{tbody.innerHTML='<tr><td colspan="7" class="empty-state"><p>暂无扫描结果</p></td></tr>'}}catch(e){console.error(e)}}
+        async function refreshScanResults(){try{const data=await api('/api/scan-results');const tbody=document.getElementById('scanResults');const files=data.files||[];document.getElementById('scanCount').textContent=files.length?'共 '+files.length+' 个文件':'';if(files.length>0){tbody.innerHTML=files.map((f,i)=>'<tr><td><input type="checkbox" class="file-select" data-file="'+escHtml(f.directory+'/'+f.filename)+'" onchange="updateSelectedFiles()"></td><td>'+(i+1)+'</td><td>'+escHtml(f.filename)+'</td><td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(f.directory)+'</td><td>'+formatSize(f.size)+'</td><td><span class="badge '+(f.has_nfo?'success':'danger')+'">NFO</span> <span class="badge '+(f.has_vsmeta?'success':'danger')+'">VSMETA</span> <span class="badge '+(f.has_poster?'success':'danger')+'">封面</span> <span class="badge '+(f.has_backdrop?'success':'danger')+'">背景</span></td><td>'+(f.is_converted?'<span class="badge success">已转换</span>':'<span class="badge warning">待转换</span>')+'</td><td><button class="btn btn-sm" onclick="showFileDetail(\''+escHtml(f.directory+'/'+f.filename)+'\')">详情</button></td></tr>').join('')}else{tbody.innerHTML='<tr><td colspan="8" class="empty-state"><p>暂无扫描结果</p></td></tr>'}}catch(e){console.error(e)}}
+        
+        async function showFileDetail(filepath){try{const data=await api('/api/file-detail','POST',{filepath:filepath});const modal=document.getElementById('fileDetailModal');if(data.nfo_metadata){modal.innerHTML='<div class="modal-overlay" onclick="closeFileDetailModal(event)"><div class="modal-box" style="max-width:800px" onclick="event.stopPropagation()"><h3>'+escHtml(data.filename)+'</h3><div class="form-row"><div><strong>状态:</strong> '+(data.is_converted?'<span class="badge success">已转换</span>':'<span class="badge warning">待转换</span>')+'</div><div><strong>NFO:</strong> '+(data.has_nfo?'<span class="badge success">有</span>':'<span class="badge danger">无</span>')+'</div><div><strong>VSMETA:</strong> '+(data.has_vsmeta?'<span class="badge success">有</span>':'<span class="badge danger">无</span>')+'</div><div><strong>封面:</strong> '+(data.has_poster?'<span class="badge success">有</span>':'<span class="badge danger">无</span>')+'</div><div><strong>背景:</strong> '+(data.has_backdrop?'<span class="badge success">有</span>':'<span class="badge danger">无</span>')+'</div></div><div style="margin-top:20px"><strong>标题:</strong> '+escHtml(data.nfo_metadata.title||'无')+'</div><div><strong>年份:</strong> '+escHtml(String(data.nfo_metadata.year||'无'))+'</div><div><strong>评分:</strong> '+escHtml(String(data.nfo_metadata.rating||'无'))+'</div><div><strong>类型:</strong> '+escHtml((data.nfo_metadata.genres||[]).join(', ')||'无')+'</div><div style="margin-top:10px"><strong>剧情:</strong><p style="color:var(--text-secondary);margin-top:5px">'+escHtml(data.nfo_metadata.plot||'无')+'</p></div><div class="modal-actions"><button class="btn" onclick="closeFileDetailModal()">关闭</button></div></div></div>';}else{modal.innerHTML='<div class="modal-overlay" onclick="closeFileDetailModal(event)"><div class="modal-box" onclick="event.stopPropagation()"><h3>'+escHtml(data.filename)+'</h3><p style="color:var(--text-secondary)">元数据不可用</p><div class="modal-actions"><button class="btn" onclick="closeFileDetailModal()">关闭</button></div></div></div>';}}catch(e){showToast('获取详情失败: '+e.message,'error')}}
+        
+        function closeFileDetailModal(e){document.getElementById('fileDetailModal').innerHTML='';}
         function toggleSelectAll(cb){document.querySelectorAll('.file-select[data-file]').forEach(c=>c.checked=cb.checked);updateSelectedFiles()}
         function selectAllFiles(){document.querySelectorAll('.file-select[data-file]').forEach(c=>c.checked=true);updateSelectedFiles()}
         function deselectAllFiles(){document.querySelectorAll('.file-select[data-file]').forEach(c=>c.checked=false);updateSelectedFiles()}
@@ -893,10 +933,26 @@ INDEX_HTML = r"""<!DOCTYPE html>
         function startPolling(){if(pollTimer)clearInterval(pollTimer);pollTimer=setInterval(async()=>{await refreshDashboard();await refreshLogs();await refreshScanResults();const dot=document.getElementById('statusDot');const running=dot&&dot.classList.contains('running');const ni=running?1000:5000;if(ni!==pollInterval){pollInterval=ni;startPolling()}},pollInterval)}
 
         // === 键盘快捷键 ===
-        document.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='s'){e.preventDefault();saveConfig()}else if(e.ctrlKey&&e.key==='r'){e.preventDefault();refreshDashboard()}else if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();if(document.getElementById('btnStart').style.display!=='none')startConversion()}else if(e.key==='Escape'){closeModal()}else if(e.key==='t'||e.key==='T'){if(e.target.tagName!=='INPUT'&&e.target.tagName!=='TEXTAREA')toggleTheme()}else if(e.key>='1'&&e.key<='9'){const tabs=['dashboard','config','smart','convert','tools','report','checkpoint','backup','logs','plugins'];const idx=parseInt(e.key)-1;if(tabs[idx]){e.preventDefault();switchTab(tabs[idx])}}});
+        document.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='s'){e.preventDefault();saveConfig()}else if(e.ctrlKey&&e.key==='r'){e.preventDefault();refreshDashboard()}else if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();if(document.getElementById('btnStart').style.display!=='none')startConversion()}else if(e.key==='Escape'){closeModal()}else if(e.key==='t'||e.key==='T'){if(e.target.tagName!=='INPUT'&&e.target.tagName!=='TEXTAREA')toggleTheme()}else if(e.key>='1'&&e.key<='9'){const tabs=['dashboard','config','smart','convert','visual','tools','report','checkpoint','backup','logs','plugins'];const idx=parseInt(e.key)-1;if(tabs[idx]){e.preventDefault();switchTab(tabs[idx])}}});
 
         // === 页面可见性检测 ===
         document.addEventListener('visibilitychange',()=>{if(document.hidden){if(pollTimer)clearInterval(pollTimer);pollTimer=setInterval(async()=>{await refreshDashboard();await refreshLogs()},10000)}else{startPolling()}});
+
+        // === 可视化对比功能 ===
+        let visualMonitorTimer=null,visualSelectedFile=null;
+        let visualFiles=[];
+        
+        async function visualScanFiles(){try{const dir=document.getElementById('visualScanDir').value;showToast('扫描中...','info');const data=await api('/api/visual/scan','POST',{directory:dir});visualFiles=data.files||[];renderVisualFileTree();showToast(`找到 ${visualFiles.length} 个文件`,'success')}catch(e){showToast('扫描失败: '+e.message,'error')}}
+        
+        function renderVisualFileTree(){const container=document.getElementById('visualFileTree');if(visualFiles.length===0){container.innerHTML='<div class="empty-state"><div class="icon">📁</div><p>没有找到视频文件</p></div>';return}let html='<div style="display:flex;flex-direction:column;gap:4px">';visualFiles.forEach((f,idx)=>{const statusDot=f.is_converted?'🟢':(f.has_nfo?'🟡':'🔴');const isSelected=visualSelectedFile===f.path;html+='<div style="display:flex;align-items:center;gap:8px;padding:8px;cursor:pointer;border-radius:6px;'+(isSelected?'background:var(--accent);color:#fff':'')+'" onclick="visualSelectFile('+idx+')"><span style="font-size:16px">'+statusDot+'</span><div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(f.name)+'</div></div>'});html+='</div>';container.innerHTML=html}
+        
+        async function visualSelectFile(idx){visualSelectedFile=visualFiles[idx].path;renderVisualFileTree();try{const data=await api('/api/visual/detail','POST',{filepath:visualSelectedFile});renderVisualDiff(data)}catch(e){showToast('获取详情失败: '+e.message,'error')}}
+        
+        function renderVisualDiff(data){const container=document.getElementById('visualDiffView');if(!data){container.innerHTML='<div class="empty-state"><div class="icon">📊</div><p>数据加载失败</p></div>';return}let html='<div style="display:flex;flex-direction:column;gap:15px">';html+='<div style="display:flex;gap:10px;flex-wrap:wrap"><span class="badge '+(data.has_nfo?'success':'danger')+'">NFO: '+(data.has_nfo?'有':'无')+'</span><span class="badge '+(data.has_vsmeta?'success':'danger')+'">VSMETA: '+(data.has_vsmeta?'有':'无')+'</span><span class="badge '+(data.has_poster?'success':'danger')+'">海报: '+(data.has_poster?'有':'无')+'</span><span class="badge '+(data.has_backdrop?'success':'danger')+'">背景: '+(data.has_backdrop?'有':'无')+'</span></div>';if(data.nfo_metadata){const meta=data.nfo_metadata;html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';html+='<div class="card" style="margin:0"><div class="card-header" style="margin:0;padding:10px"><h3>📄 NFO元数据</h3></div><div style="padding:10px">';html+='<div style="margin-bottom:8px"><strong>标题:</strong> '+escHtml(meta.title||'N/A')+'</div>';html+='<div style="margin-bottom:8px"><strong>年份:</strong> '+escHtml(String(meta.year||'N/A'))+'</div>';html+='<div style="margin-bottom:8px"><strong>评分:</strong> '+escHtml(String(meta.rating||'N/A'))+'</div>';html+='<div style="margin-bottom:8px"><strong>类型:</strong> '+escHtml((meta.genres||[]).join(', ')||'N/A')+'</div>';html+='<div style="margin-bottom:8px"><strong>导演:</strong> '+escHtml((meta.directors||[]).join(', ')||'N/A')+'</div>';html+='<div style="margin-bottom:8px"><strong>演员:</strong> '+escHtml((meta.actors||[]).join(', ')||'N/A')+'</div>';html+='<div><strong>剧情:</strong><p style="color:var(--text-secondary);margin-top:4px;font-size:13px">'+escHtml(meta.plot||'N/A')+'</p></div>';html+='</div></div>';html+='<div class="card" style="margin:0"><div class="card-header" style="margin:0;padding:10px"><h3>📦 VSMETA状态</h3></div><div style="padding:10px">';if(data.has_vsmeta){html+='<p style="color:var(--text-secondary)">VSMETA文件已存在</p>';html+='<div style="margin-top:15px"><button class="btn btn-danger btn-sm" onclick="visualRollbackFile()">↩️ 回滚此文件</button></div>';}else{html+='<p style="color:var(--text-secondary)">VSMETA文件不存在，等待转换</p>'}html+='</div></div>';html+='</div>'}else{html+='<div class="empty-state"><div class="icon">📄</div><p>NFO文件不存在或无法解析</p></div>'}html+='</div>';container.innerHTML=html}
+        
+        async function visualRollbackFile(){if(!visualSelectedFile)return;showConfirm('回滚确认','确定要回滚此文件吗？这将删除生成的VSMETA文件。',async()=>{try{const data=await api('/api/visual/rollback','POST',{filepath:visualSelectedFile});showToast(data.message||'回滚成功','success');visualScanFiles()}catch(e){showToast('回滚失败: '+e.message,'error')}})}
+        
+        async function startVisualMonitor(){if(visualMonitorTimer)clearInterval(visualMonitorTimer);visualMonitorTimer=setInterval(async()=>{try{const data=await api('/api/status');const monitor=document.getElementById('visualMonitor');let html='';html+='<div style="margin-bottom:10px"><strong>状态:</strong> '+(data.is_running?'<span style="color:var(--accent)">运行中</span>':'<span style="color:var(--text-muted)">就绪</span>')+'</div>';const p=data.progress||{};html+='<div style="margin-bottom:5px">总文件: '+p.total+'</div>';html+='<div style="margin-bottom:5px">已处理: '+p.completed+'</div>';html+='<div style="margin-bottom:5px">成功: <span style="color:var(--success)">'+p.success+'</span></div>';html+='<div style="margin-bottom:5px">失败: <span style="color:var(--danger)">'+p.failed+'</span></div>';html+='<div style="margin-bottom:5px">跳过: <span style="color:var(--warning)">'+p.skipped+'</span></div>';if(p.current_file){html+='<div style="margin-top:15px;padding-top:10px;border-top:1px solid var(--border)"><strong>当前处理:</strong></div>';html+='<div style="margin-top:5px;color:var(--text-secondary);word-break:break-all">'+escHtml(p.current_file)+'</div>'}html+='<div style="margin-top:15px;padding-top:10px;border-top:1px solid var(--border)"><strong>时间:</strong> '+new Date().toLocaleTimeString()+'</div>';monitor.innerHTML=html}catch(e){console.error(e)}},2000)}
 
         // === 初始化 ===
         (async function(){try{const s=await api('/api/status');csrfToken=s.csrf_token||''}catch(e){console.error(e)}loadConfig();refreshDashboard();refreshPlugins();startPolling()})();
@@ -1136,20 +1192,51 @@ def api_start_conversion() -> Tuple:
                 scan_data = []
                 for d, f in files:
                     fp = os.path.join(d, f)
+                    base_name = os.path.splitext(f)[0]
+                    
                     nfo_found = any(
-                        os.path.exists(fp + ext) for ext in (config.nfo_extensions or [".nfo"])
+                        os.path.exists(os.path.join(d, base_name + ext)) for ext in (config.nfo_extensions or [".nfo"])
                     )
+                    vsmeta_found = os.path.exists(fp + config.vsmeta_extension)
+                    
+                    # 检查封面和背景图
+                    poster_exts = [".jpg", ".jpeg", ".png", ".gif", ".webp"]
+                    poster_names = [base_name + "-poster", base_name, "poster", "folder"]
+                    has_poster = False
+                    for name in poster_names:
+                        for ext in poster_exts:
+                            if os.path.exists(os.path.join(d, name + ext)):
+                                has_poster = True
+                                break
+                        if has_poster:
+                            break
+                    
+                    backdrop_names = [base_name + "-fanart", base_name + "-backdrop", "fanart", "backdrop"]
+                    has_backdrop = False
+                    for name in backdrop_names:
+                        for ext in poster_exts:
+                            if os.path.exists(os.path.join(d, name + ext)):
+                                has_backdrop = True
+                                break
+                        if has_backdrop:
+                            break
+                    
                     size = 0
                     try:
                         size = os.path.getsize(fp)
                     except OSError:
                         pass
+                    
                     scan_data.append(
                         {
                             "filename": f,
                             "directory": d,
                             "size": size,
                             "has_nfo": nfo_found,
+                            "has_vsmeta": vsmeta_found,
+                            "has_poster": has_poster,
+                            "has_backdrop": has_backdrop,
+                            "is_converted": nfo_found and vsmeta_found,
                             "selected": f"{d}/{f}" in selected_files,
                         }
                     )
@@ -1247,6 +1334,89 @@ def api_stop_conversion() -> Dict:
 def api_get_scan_results() -> Dict:
     results = _get_state("scan_results", [])
     return jsonify({"files": results})
+
+
+@app.route("/api/file-detail", methods=["POST"])
+@require_api_token
+@require_csrf
+def api_get_file_detail() -> Tuple:
+    """获取单个文件的详细元数据信息"""
+    data = request.get_json(silent=True) or {}
+    filepath = str(data.get("filepath", "")).strip()
+    if not filepath or not os.path.exists(filepath):
+        return jsonify({"error": "文件不存在"}), 404
+    if not _validate_path(filepath, allow_absolute=True):
+        return jsonify({"error": "路径不安全"}), 403
+    
+    try:
+        directory = os.path.dirname(filepath)
+        filename = os.path.basename(filepath)
+        base_name = os.path.splitext(filename)[0]
+        
+        from nfo_to_vsmeta_converter_complete import Config, NFOParser
+        config = _get_state("config") or Config()
+        
+        result = {
+            "filepath": filepath,
+            "filename": filename,
+            "has_nfo": False,
+            "has_vsmeta": False,
+            "has_poster": False,
+            "has_backdrop": False,
+            "is_converted": False,
+            "nfo_metadata": None,
+            "vsmeta_preview": None
+        }
+        
+        # 检查各种文件
+        nfo_path = os.path.join(directory, base_name + ".nfo")
+        if os.path.exists(nfo_path):
+            result["has_nfo"] = True
+            # 尝试解析 NFO
+            parser = NFOParser(config)
+            metadata = parser.parse(nfo_path)
+            if metadata:
+                result["nfo_metadata"] = {
+                    "title": metadata.title,
+                    "year": metadata.year,
+                    "rating": metadata.rating,
+                    "plot": metadata.plot,
+                    "genres": metadata.genres,
+                    "directors": metadata.directors,
+                    "actors": metadata.actors
+                }
+        
+        vsmeta_path = filepath + config.vsmeta_extension
+        if os.path.exists(vsmeta_path):
+            result["has_vsmeta"] = True
+        
+        # 检查封面图和背景图
+        poster_exts = [".jpg", ".jpeg", ".png", ".gif", ".webp"]
+        poster_names = [base_name + "-poster", base_name, "poster", "folder"]
+        for name in poster_names:
+            for ext in poster_exts:
+                if os.path.exists(os.path.join(directory, name + ext)):
+                    result["has_poster"] = True
+                    break
+            if result["has_poster"]:
+                break
+        
+        backdrop_names = [base_name + "-fanart", base_name + "-backdrop", "fanart", "backdrop"]
+        for name in backdrop_names:
+            for ext in poster_exts:
+                if os.path.exists(os.path.join(directory, name + ext)):
+                    result["has_backdrop"] = True
+                    break
+            if result["has_backdrop"]:
+                break
+        
+        # 判断是否已完成转换
+        result["is_converted"] = result["has_nfo"] and result["has_vsmeta"]
+        
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"获取文件详情失败: {e}")
+        return jsonify({"error": f"获取详情失败: {e}"}), 500
 
 
 @app.route("/api/scan-results/select", methods=["POST"])
@@ -1902,6 +2072,204 @@ def api_create_plugin() -> Dict:
     except Exception as e:
         _add_log("error", f"创建插件模板失败: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+# ============================================================================
+# 可视化对比 API
+# ============================================================================
+
+
+@app.route("/api/visual/scan", methods=["POST"])
+@require_api_token
+@require_csrf
+def api_visual_scan() -> Tuple:
+    """扫描目录获取视频文件列表"""
+    data = request.get_json(silent=True) or {}
+    directory = str(data.get("directory", ".")).strip()
+    if not directory:
+        return jsonify({"error": "目录不能为空"}), 400
+    if not _validate_path(directory, allow_absolute=True):
+        return jsonify({"error": "路径不安全"}), 403
+    if not os.path.isdir(directory):
+        return jsonify({"error": "目录不存在"}), 404
+    
+    try:
+        from nfo_to_vsmeta_converter_complete import Config
+        
+        config = Config()
+        video_extensions = getattr(config, "video_extensions", [".mp4", ".mkv", ".avi", ".ts", ".wmv", ".rmvb", ".mov", ".m4v"])
+        nfo_extensions = getattr(config, "nfo_extensions", [".nfo"])
+        vsmeta_extension = getattr(config, "vsmeta_extension", ".vsmeta")
+        
+        files = []
+        for root, dirs, filenames in os.walk(directory):
+            for filename in filenames:
+                ext = os.path.splitext(filename)[1].lower()
+                if ext in video_extensions:
+                    filepath = os.path.join(root, filename)
+                    base_name = os.path.splitext(filename)[0]
+                    
+                    # 检查NFO
+                    has_nfo = any(os.path.exists(os.path.join(root, base_name + nfo_ext)) for nfo_ext in nfo_extensions)
+                    
+                    # 检查VSMETA
+                    has_vsmeta = os.path.exists(filepath + vsmeta_extension)
+                    
+                    # 检查海报和背景图
+                    poster_exts = [".jpg", ".jpeg", ".png", ".gif", ".webp"]
+                    poster_names = [base_name + "-poster", base_name, "poster", "folder"]
+                    has_poster = any(os.path.exists(os.path.join(root, name + ext)) for name in poster_names for ext in poster_exts)
+                    
+                    backdrop_names = [base_name + "-fanart", base_name + "-backdrop", "fanart", "backdrop"]
+                    has_backdrop = any(os.path.exists(os.path.join(root, name + ext)) for name in backdrop_names for ext in poster_exts)
+                    
+                    files.append({
+                        "name": filename,
+                        "path": filepath,
+                        "directory": root,
+                        "has_nfo": has_nfo,
+                        "has_vsmeta": has_vsmeta,
+                        "has_poster": has_poster,
+                        "has_backdrop": has_backdrop,
+                        "is_converted": has_nfo and has_vsmeta,
+                    })
+        
+        files.sort(key=lambda x: x["name"])
+        _add_log("info", f"扫描完成，找到 {len(files)} 个视频文件")
+        return jsonify({"files": files})
+    except Exception as e:
+        _add_log("error", f"扫描失败: {e}")
+        return jsonify({"error": f"扫描失败: {e}"}), 500
+
+
+@app.route("/api/visual/detail", methods=["POST"])
+@require_api_token
+@require_csrf
+def api_visual_detail() -> Tuple:
+    """获取单个文件的详细信息"""
+    data = request.get_json(silent=True) or {}
+    filepath = str(data.get("filepath", "")).strip()
+    if not filepath or not os.path.isfile(filepath):
+        return jsonify({"error": "文件不存在"}), 404
+    if not _validate_path(filepath, allow_absolute=True):
+        return jsonify({"error": "路径不安全"}), 403
+    
+    try:
+        from nfo_to_vsmeta_converter_complete import Config, NFOParser
+        
+        directory = os.path.dirname(filepath)
+        filename = os.path.basename(filepath)
+        base_name = os.path.splitext(filename)[0]
+        
+        config = Config()
+        nfo_extensions = getattr(config, "nfo_extensions", [".nfo"])
+        vsmeta_extension = getattr(config, "vsmeta_extension", ".vsmeta")
+        
+        # 检查NFO
+        nfo_path = None
+        has_nfo = False
+        for nfo_ext in nfo_extensions:
+            candidate = os.path.join(directory, base_name + nfo_ext)
+            if os.path.exists(candidate):
+                nfo_path = candidate
+                has_nfo = True
+                break
+        
+        # 检查VSMETA
+        has_vsmeta = os.path.exists(filepath + vsmeta_extension)
+        
+        # 检查海报和背景图
+        poster_exts = [".jpg", ".jpeg", ".png", ".gif", ".webp"]
+        poster_names = [base_name + "-poster", base_name, "poster", "folder"]
+        has_poster = any(os.path.exists(os.path.join(directory, name + ext)) for name in poster_names for ext in poster_exts)
+        
+        backdrop_names = [base_name + "-fanart", base_name + "-backdrop", "fanart", "backdrop"]
+        has_backdrop = any(os.path.exists(os.path.join(directory, name + ext)) for name in backdrop_names for ext in poster_exts)
+        
+        result = {
+            "filepath": filepath,
+            "filename": filename,
+            "has_nfo": has_nfo,
+            "has_vsmeta": has_vsmeta,
+            "has_poster": has_poster,
+            "has_backdrop": has_backdrop,
+            "is_converted": has_nfo and has_vsmeta,
+            "nfo_metadata": None,
+            "vsmeta_preview": None,
+        }
+        
+        # 解析NFO
+        if has_nfo and nfo_path:
+            try:
+                parser = NFOParser(config)
+                metadata = parser.parse(nfo_path)
+                if metadata:
+                    result["nfo_metadata"] = {
+                        "title": metadata.title,
+                        "original_title": metadata.original_title,
+                        "year": metadata.year,
+                        "rating": metadata.rating,
+                        "plot": metadata.plot,
+                        "tagline": metadata.tagline,
+                        "runtime": metadata.runtime,
+                        "genres": metadata.genres,
+                        "directors": metadata.directors,
+                        "actors": metadata.actors,
+                        "writers": metadata.writers,
+                        "studios": metadata.studios,
+                        "countries": metadata.countries,
+                        "languages": metadata.languages,
+                        "certifications": metadata.certifications,
+                        "release_date": metadata.release_date,
+                        "poster_url": metadata.poster_url,
+                        "backdrop_url": metadata.backdrop_url,
+                        "trailer_url": metadata.trailer_url,
+                        "imdb_id": metadata.imdb_id,
+                        "tmdb_id": metadata.tmdb_id,
+                        "tvdb_id": metadata.tvdb_id,
+                        "season": metadata.season,
+                        "episode": metadata.episode,
+                        "episode_title": metadata.episode_title,
+                        "series_name": metadata.series_name,
+                        "episode_plot": metadata.episode_plot,
+                    }
+            except Exception as e:
+                logger.warning(f"解析NFO失败: {e}")
+        
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"获取详情失败: {e}")
+        return jsonify({"error": f"获取详情失败: {e}"}), 500
+
+
+@app.route("/api/visual/rollback", methods=["POST"])
+@require_api_token
+@require_csrf
+def api_visual_rollback() -> Tuple:
+    """回滚文件，删除生成的VSMETA"""
+    data = request.get_json(silent=True) or {}
+    filepath = str(data.get("filepath", "")).strip()
+    if not filepath or not os.path.isfile(filepath):
+        return jsonify({"error": "文件不存在"}), 404
+    if not _validate_path(filepath, allow_absolute=True):
+        return jsonify({"error": "路径不安全"}), 403
+    
+    try:
+        from nfo_to_vsmeta_converter_complete import Config
+        
+        config = Config()
+        vsmeta_extension = getattr(config, "vsmeta_extension", ".vsmeta")
+        vsmeta_path = filepath + vsmeta_extension
+        
+        if os.path.exists(vsmeta_path):
+            os.remove(vsmeta_path)
+            _add_log("success", f"已回滚: {os.path.basename(filepath)}")
+            return jsonify({"success": True, "message": "回滚成功"})
+        else:
+            return jsonify({"success": True, "message": "VSMETA文件不存在"})
+    except Exception as e:
+        _add_log("error", f"回滚失败: {e}")
+        return jsonify({"error": f"回滚失败: {e}"}), 500
 
 
 # ============================================================================
