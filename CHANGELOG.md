@@ -5,6 +5,43 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [2.1.0] - 2026-05-19
+
+### 🎉 新功能
+
+- **中文简繁转换**
+  - 🌏 集成 chinese_converter.py 模块
+  - 支持简体中文、繁体中文（台湾/香港/澳门/新加坡）互转
+  - 自动转换元数据中的标题、简介、演员列表等文本字段
+  - 支持命令行和 Web UI 配置
+
+- **增强 XML 解析**
+  - 🌐 集成 xml_parser.py 模块
+  - 支持多种解析后端（lxml、defusedxml、标准库）
+  - 自动选择最优解析器，优雅降级
+  - 增强的 XML 解析性能和安全性
+
+### ✨ 改进
+
+- **Web UI 增强**
+  - 添加中文转换配置选项
+  - 改进配置表单布局
+  - 添加配置字段验证
+
+- **桌面 GUI 增强**
+  - 所有 GUI 应用添加中文转换设置
+  - 改进配置保存和加载逻辑
+  - 增强用户体验
+
+### 🔧 集成工作
+
+- ✅ 整合 xml_parser.py 到主程序
+- ✅ 整合 chinese_converter.py 到主程序
+- ✅ 更新所有 UI 界面（Web UI 和桌面 GUI）
+- ✅ 更新文档和 README
+
+---
+
 ## [2.0.1] - 2024-12-17
 
 ### 🎉 新功能

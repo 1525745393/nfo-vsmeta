@@ -574,7 +574,26 @@ class MainWindow(QMainWindow):
         general_layout.addRow("日志级别:", self.log_level_combo)
         
         layout.addWidget(general_group)
-        
+
+        # 中文转换设置
+        chinese_group = QGroupBox("🌏 中文转换设置")
+        chinese_layout = QFormLayout(chinese_group)
+
+        self.enable_chinese_conversion_check = QCheckBox("启用中文简繁转换")
+        chinese_layout.addRow("", self.enable_chinese_conversion_check)
+
+        self.chinese_target_combo = QComboBox()
+        self.chinese_target_combo.addItems([
+            '简体中文 (zh-cn)',
+            '繁体中文 (zh-tw)',
+            '繁体中文 (zh-hk)',
+            '简体中文 (zh-sg)',
+            '繁体中文 (zh-mo)'
+        ])
+        chinese_layout.addRow("转换目标:", self.chinese_target_combo)
+
+        layout.addWidget(chinese_group)
+
         # 路径设置
         path_group = QGroupBox("📁 路径设置")
         path_layout = QFormLayout(path_group)
@@ -896,12 +915,15 @@ class MainWindow(QMainWindow):
         settings.setValue("output_dir", self.output_path_input.text())
         settings.setValue("temp_dir", self.temp_path_input.text())
         settings.setValue("theme", self.theme_manager.current_theme.name)
+        # 中文转换设置
+        settings.setValue("enable_chinese_conversion", self.enable_chinese_conversion_check.isChecked())
+        settings.setValue("chinese_target", self.chinese_target_combo.currentIndex())
         settings.sync()
-        
+
         QMessageBox.information(self, "成功", "设置已保存！")
         if UI_COMPONENTS_AVAILABLE:
             self._log_widget.info("💾 设置已保存")
-    
+
     def reset_settings(self):
         """重置设置"""
         reply = QMessageBox.question(
@@ -910,13 +932,15 @@ class MainWindow(QMainWindow):
             "确定要重置所有设置吗？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
-        
+
         if reply == QMessageBox.StandardButton.Yes:
             self.default_workers_spin.setValue(4)
             self.default_lang_combo.setCurrentIndex(0)
             self.log_level_combo.setCurrentIndex(1)
             self.output_path_input.setText("./output")
             self.temp_path_input.setText("./temp")
+            self.enable_chinese_conversion_check.setChecked(False)
+            self.chinese_target_combo.setCurrentIndex(0)
             if UI_COMPONENTS_AVAILABLE:
                 self._log_widget.info("🔄 设置已重置")
     
@@ -977,7 +1001,15 @@ class MainWindow(QMainWindow):
         
         self.output_path_input.setText(settings.value("output_dir", "./output", type=str))
         self.temp_path_input.setText(settings.value("temp_dir", "./temp", type=str))
-    
+
+        # 中文转换设置
+        enable_chinese = settings.value("enable_chinese_conversion", False, type=bool)
+        self.enable_chinese_conversion_check.setChecked(enable_chinese)
+
+        chinese_target_idx = settings.value("chinese_target", 0, type=int)
+        if 0 <= chinese_target_idx < self.chinese_target_combo.count():
+            self.chinese_target_combo.setCurrentIndex(chinese_target_idx)
+
     def closeEvent(self, event):
         """关闭窗口事件"""
         self.save_settings()
