@@ -71,6 +71,21 @@ import sys  # 系统相关功能
 import threading  # 多线程支持
 import time  # 时间相关功能
 import xml.etree.ElementTree as ET  # XML 解析
+# 整合 xml_parser.py - 增强的 XML 解析器
+try:
+    from xml_parser import XMLParser
+    XML_PARSER_AVAILABLE = True
+except ImportError:
+    XML_PARSER_AVAILABLE = False
+    logger.warning("xml_parser 模块未找到，使用标准 XML 解析")
+
+# 整合 chinese_converter.py - 中文简繁转换
+try:
+    from chinese_converter import ChineseConverter
+    CHINESE_CONVERTER_AVAILABLE = True
+except ImportError:
+    CHINESE_CONVERTER_AVAILABLE = False
+    logger.warning("chinese_converter 模块未找到，中文转换功能不可用")
 
 # 并发处理相关
 from abc import ABC, abstractmethod  # 抽象基类（插件系统）
@@ -381,6 +396,10 @@ class Config:
     # === 性能优化配置 ===
     image_cache_max_size: int = 50  # 图片缓存最大数量
     checkpoint_save_interval: int = 10  # 断点保存间隔（文件数）
+    
+    # === 中文转换配置 ===
+    enable_chinese_conversion: bool = False  # 是否启用中文简繁转换
+    chinese_conversion_target: str = "zh-cn"  # 目标语言：zh-cn(简体), zh-tw(繁体), zh-hk(繁体香港), etc.
 
     def __post_init__(self):
         """
@@ -651,17 +670,18 @@ class NFOParser:
                 return None
 
             # === 从字符串解析 XML ===
-            # 使用 defusedxml 防止 XML 外部实体（XXE）攻击
-            try:
-                from defusedxml import ElementTree as DefusedET
-
-                root = DefusedET.fromstring(content)
-            except ImportError:
-                # 如果 defusedxml 未安装，使用标准库并禁用实体处理
-                logger.warning("defusedxml 未安装，使用标准库 XML 解析（安全性降低）")
-                parser = ET.XMLParser()
-                parser.entity = {}
-                root = ET.fromstring(content, parser=parser)
+            # 优先使用整合的 xml_parser.py
+            if XML_PARSER_AVAILABLE:
+                try:
+                    xml_parser = XMLParser(prefer_performance=False)  # 默认优先安全
+                    root = xml_parser.fromstring(content)
+                    logger.debug(f"使用 xml_parser.py 解析 XML (当前解析器: {xml_parser.current_parser})")
+                except Exception as e:
+                    logger.warning(f"xml_parser.py 解析失败，降级使用标准方法: {e}")
+                    root = self._parse_xml_fallback(content)
+            else:
+                root = self._parse_xml_fallback(content)
+                
             return self._extract_metadata(root, nfo_path)
         except ET.ParseError as e:
             logger.error(f"解析 NFO 文件失败 {nfo_path}: {e}")
@@ -669,6 +689,26 @@ class NFOParser:
         except Exception as e:
             logger.error(f"读取 NFO 文件失败 {nfo_path}: {e}")
             return None
+    
+    def _parse_xml_fallback(self, content: str):
+        """
+        备用 XML 解析方法（当 xml_parser 不可用时）
+        
+        Args:
+            content: XML 字符串内容
+            
+        Returns:
+            XML 根元素
+        """
+        try:
+            from defusedxml import ElementTree as DefusedET
+            root = DefusedET.fromstring(content)
+        except ImportError:
+            logger.warning("defusedxml 未安装，使用标准库 XML 解析（安全性降低）")
+            parser = ET.XMLParser()
+            parser.entity = {}
+            root = ET.fromstring(content, parser=parser)
+        return root
 
     def _extract_metadata(self, root: ET.Element, nfo_path: str) -> VideoMetadata:
         """
@@ -741,6 +781,48 @@ class NFOParser:
                 if show_name and not metadata.series_name:
                     metadata.series_name = show_name
 
+        # === 后处理：中文简繁转换 ===
+        if self.config.enable_chinese_conversion and CHINESE_CONVERTER_AVAILABLE:
+            metadata = self._apply_chinese_conversion(metadata)
+
+        return metadata
+    
+    def _apply_chinese_conversion(self, metadata: VideoMetadata) -> VideoMetadata:
+        """
+        对元数据中的文本字段应用中文简繁转换
+        
+        Args:
+            metadata: 原始元数据对象
+            
+        Returns:
+            转换后的元数据对象
+        """
+        try:
+            converter = ChineseConverter(target=self.config.chinese_conversion_target)
+            
+            # 转换单个文本字段
+            text_fields = [
+                "title", "original_title", "plot", "tagline", 
+                "series_name", "episode_title", "episode_plot"
+            ]
+            for field in text_fields:
+                value = getattr(metadata, field, None)
+                if value and isinstance(value, str):
+                    converted = converter.convert(value)
+                    setattr(metadata, field, converted)
+            
+            # 转换列表字段
+            list_fields = ["genres", "directors", "writers", "studios", "countries", "languages", "actors"]
+            for field in list_fields:
+                values = getattr(metadata, field, None)
+                if values and isinstance(values, list):
+                    converted_values = [converter.convert(v) if isinstance(v, str) else v for v in values]
+                    setattr(metadata, field, converted_values)
+            
+            logger.debug(f"中文简繁转换完成，目标: {self.config.chinese_conversion_target}")
+        except Exception as e:
+            logger.warning(f"中文转换失败: {e}")
+        
         return metadata
 
     def _set_field(self, metadata: VideoMetadata, field: str, value: str):
@@ -4243,6 +4325,18 @@ def main():
     parser.add_argument(
         "--output-formats", help="输出格式列表（逗号分隔），支持 vsmeta 和 nfo，默认为 vsmeta"
     )
+    # 中文转换参数
+    parser.add_argument(
+        "--enable-chinese-conversion", 
+        action="store_true", 
+        help="启用中文简繁转换"
+    )
+    parser.add_argument(
+        "--chinese-conversion-target", 
+        choices=["zh-cn", "zh-tw", "zh-hk", "zh-sg", "zh-mo"],
+        default="zh-cn",
+        help="中文转换目标（默认: zh-cn 简体）"
+    )
     args = parser.parse_args()
 
     # === 处理 --create-plugin 参数 ===
@@ -4313,6 +4407,11 @@ def main():
         config.log_level = args.log_level
         if args.log_file:
             config.log_file = args.log_file
+        # 中文转换参数
+        if args.enable_chinese_conversion:
+            config.enable_chinese_conversion = True
+        if args.chinese_conversion_target:
+            config.chinese_conversion_target = args.chinese_conversion_target
 
         converter = NFOToVSMETAConverter(config)
         # 自动加载插件
