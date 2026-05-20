@@ -293,116 +293,116 @@ INDEX_HTML = '''
 </head>
 <body>
     <div class="header">
-        <div class="logo">🎬 NFO to VSMETA Converter</div>
-        <button class="btn" onclick="toggleTheme()">🌙 Theme</button>
+        <div class="logo">🎬 NFO 转 VSMETA 转换器</div>
+        <button class="btn" onclick="toggleTheme()">🌙 主题</button>
     </div>
     
     <div class="nav">
-        <button class="nav-btn active" onclick="showPage('dashboard')">📊 Dashboard</button>
-        <button class="nav-btn" onclick="showPage('files')">📁 Files</button>
-        <button class="nav-btn" onclick="showPage('convert')">🚀 Convert</button>
-        <button class="nav-btn" onclick="showPage('logs')">📋 Logs</button>
+        <button class="nav-btn active" onclick="showPage('dashboard')">📊 仪表盘</button>
+        <button class="nav-btn" onclick="showPage('files')">📁 文件</button>
+        <button class="nav-btn" onclick="showPage('convert')">🚀 转换</button>
+        <button class="nav-btn" onclick="showPage('logs')">📋 日志</button>
     </div>
     
     <div class="page active" id="page-dashboard">
-        <h2 style="margin-bottom: 1rem;">Status</h2>
+        <h2 style="margin-bottom: 1rem;">状态</h2>
         <div class="grid">
             <div class="card">
-                <div class="stat-label">Total Files</div>
+                <div class="stat-label">总文件数</div>
                 <div class="stat-value" id="stat-total">0</div>
             </div>
             <div class="card">
-                <div class="stat-label">Converted</div>
+                <div class="stat-label">已转换</div>
                 <div class="stat-value" style="color: var(--success);" id="stat-success">0</div>
             </div>
             <div class="card">
-                <div class="stat-label">Pending</div>
+                <div class="stat-label">待转换</div>
                 <div class="stat-value" style="color: var(--warning);" id="stat-pending">0</div>
             </div>
             <div class="card">
-                <div class="stat-label">Failed</div>
+                <div class="stat-label">失败</div>
                 <div class="stat-value" style="color: var(--danger);" id="stat-failed">0</div>
             </div>
         </div>
         <div class="card">
-            <h3 style="margin-bottom: 0.5rem;">Progress</h3>
+            <h3 style="margin-bottom: 0.5rem;">进度</h3>
             <div class="progress-bar">
                 <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
             </div>
-            <div id="progress-text" style="margin-top: 0.75rem; color: var(--text2);">Waiting...</div>
+            <div id="progress-text" style="margin-top: 0.75rem; color: var(--text2);">等待中...</div>
         </div>
     </div>
     
     <div class="page" id="page-files">
-        <h2 style="margin-bottom: 1rem;">Files</h2>
+        <h2 style="margin-bottom: 1rem;">文件</h2>
         <div style="margin-bottom: 1rem;">
-            <label style="color: var(--text2);">Directory</label>
+            <label style="color: var(--text2);">目录</label>
             <input type="text" class="input" id="config-dir" value="/workspace/test_movies" placeholder="/path/to/movies">
             <div style="margin-top: 1rem;">
-                <button class="btn btn-primary" onclick="refreshFiles()">🔄 Scan Files</button>
+                <button class="btn btn-primary" onclick="refreshFiles()">🔄 扫描文件</button>
             </div>
         </div>
         
         <div class="two-col">
             <div>
-                <h3 style="margin-bottom: 0.75rem;">File List</h3>
+                <h3 style="margin-bottom: 0.75rem;">文件列表</h3>
                 <div class="tree" id="file-tree">
-                    <div style="color: var(--text2); padding: 1rem; text-align: center;">Click "Scan Files" to load files</div>
+                    <div style="color: var(--text2); padding: 1rem; text-align: center;">点击「扫描文件」加载文件</div>
                 </div>
             </div>
             
             <div>
-                <h3 style="margin-bottom: 0.75rem;">File Details</h3>
+                <h3 style="margin-bottom: 0.75rem;">文件详情</h3>
                 <div class="detail">
                     <div class="detail-tabs">
-                        <button class="detail-tab active" onclick="showDetail('overview')">📋 Overview</button>
+                        <button class="detail-tab active" onclick="showDetail('overview')">📋 概览</button>
                         <button class="detail-tab" onclick="showDetail('nfo')">📄 NFO</button>
                         <button class="detail-tab" onclick="showDetail('vsmeta')">📝 VSMETA</button>
-                        <button class="detail-tab" onclick="showDetail('compare')">🔄 Compare</button>
-                        <button class="detail-tab" onclick="showDetail('poster')">🖼️ Poster</button>
-                        <button class="detail-tab" onclick="showDetail('fanart')">🎬 Fanart</button>
+                        <button class="detail-tab" onclick="showDetail('compare')">🔄 对比</button>
+                        <button class="detail-tab" onclick="showDetail('poster')">🖼️ 封面</button>
+                        <button class="detail-tab" onclick="showDetail('fanart')">🎬 背景图</button>
                     </div>
                     
                     <div class="detail-content active" id="detail-overview">
                         <div id="overview-empty" style="color: var(--text2); padding: 2rem; text-align: center;">
                             <div style="font-size: 2.5rem; margin-bottom: 1rem;">👈</div>
-                            <div>Select a file from the list to view details</div>
+                            <div>从列表中选择一个文件查看详情</div>
                         </div>
                         <div id="overview-content"></div>
                     </div>
                     
                     <div class="detail-content" id="detail-nfo">
-                        <div id="nfo-content" class="code">No NFO content</div>
+                        <div id="nfo-content" class="code">无 NFO 内容</div>
                     </div>
                     
                     <div class="detail-content" id="detail-vsmeta">
-                        <div id="vsmeta-content" class="code">No VSMETA content</div>
+                        <div id="vsmeta-content" class="code">无 VSMETA 内容</div>
                     </div>
                     
                     <div class="detail-content" id="detail-compare">
                         <div class="compare">
                             <div>
-                                <h4 style="margin-bottom: 0.5rem;">NFO Content</h4>
-                                <div id="compare-nfo" class="code">No content</div>
+                                <h4 style="margin-bottom: 0.5rem;">NFO 内容</h4>
+                                <div id="compare-nfo" class="code">无内容</div>
                             </div>
                             <div>
-                                <h4 style="margin-bottom: 0.5rem;">VSMETA Content</h4>
-                                <div id="compare-vsmeta" class="code">No content</div>
+                                <h4 style="margin-bottom: 0.5rem;">VSMETA 内容</h4>
+                                <div id="compare-vsmeta" class="code">无内容</div>
                             </div>
                         </div>
                     </div>
                     
                     <div class="detail-content" id="detail-poster">
-                        <h4 style="margin-bottom: 0.5rem;">Poster Image</h4>
+                        <h4 style="margin-bottom: 0.5rem;">封面图片</h4>
                         <div class="image-container" id="poster-container">
-                            <div class="image-placeholder">Select a file first</div>
+                            <div class="image-placeholder">请先选择文件</div>
                         </div>
                     </div>
                     
                     <div class="detail-content" id="detail-fanart">
-                        <h4 style="margin-bottom: 0.5rem;">Fanart Image</h4>
+                        <h4 style="margin-bottom: 0.5rem;">背景图片</h4>
                         <div class="image-container" id="fanart-container">
-                            <div class="image-placeholder">Select a file first</div>
+                            <div class="image-placeholder">请先选择文件</div>
                         </div>
                     </div>
                 </div>
@@ -411,46 +411,46 @@ INDEX_HTML = '''
     </div>
     
     <div class="page" id="page-convert">
-        <h2 style="margin-bottom: 1rem;">🚀 Convert</h2>
+        <h2 style="margin-bottom: 1rem;">🚀 转换</h2>
         
         <div class="alert">
-            ⚠️ This version uses subprocess to call the converter, stable and reliable!
+            ⚠️ 此版本使用 subprocess 调用转换器，稳定可靠！
         </div>
         
         <div class="card">
-            <h3 style="margin-bottom: 1rem;">Settings</h3>
+            <h3 style="margin-bottom: 1rem;">设置</h3>
             <div style="margin-bottom: 1rem;">
-                <label style="color: var(--text2);">Directory</label>
+                <label style="color: var(--text2);">目录</label>
                 <input type="text" class="input" id="convert-dir" value="/workspace/test_movies">
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div>
-                    <label style="color: var(--text2);">Workers</label>
+                    <label style="color: var(--text2);">工作线程数</label>
                     <input type="number" class="input" id="workers" value="4">
                 </div>
                 <div>
-                    <label style="color: var(--text2);">Options</label>
+                    <label style="color: var(--text2);">选项</label>
                     <div style="margin-top: 0.75rem;">
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" id="overwrite"> Overwrite existing VSMETA
+                            <input type="checkbox" id="overwrite"> 覆盖已有的 VSMETA
                         </label>
                     </div>
                 </div>
             </div>
             <div>
-                <button class="btn btn-primary" id="btn-start" onclick="startConversion()">▶️ Start Convert</button>
-                <button class="btn btn-danger" id="btn-stop" onclick="stopConversion()" style="display:none;">⏹️ Stop Convert</button>
+                <button class="btn btn-primary" id="btn-start" onclick="startConversion()">▶️ 开始转换</button>
+                <button class="btn btn-danger" id="btn-stop" onclick="stopConversion()" style="display:none;">⏹️ 停止转换</button>
             </div>
         </div>
     </div>
     
     <div class="page" id="page-logs">
-        <h2 style="margin-bottom: 1rem;">Logs</h2>
+        <h2 style="margin-bottom: 1rem;">日志</h2>
         <div style="margin-bottom: 1rem;">
-            <button class="btn" onclick="refreshLogs()">🔄 Refresh</button>
-            <button class="btn" onclick="clearLogs()">🗑️ Clear</button>
+            <button class="btn" onclick="refreshLogs()">🔄 刷新</button>
+            <button class="btn" onclick="clearLogs()">🗑️ 清空</button>
         </div>
-        <div class="log-box" id="log-box">No logs</div>
+        <div class="log-box" id="log-box">无日志</div>
     </div>
     
     <script>
@@ -509,7 +509,7 @@ INDEX_HTML = '''
             const container = document.getElementById('file-tree');
             
             if (!scanResults.length) {
-                container.innerHTML = '<div style="text-align:center; padding:2rem; color:var(--text2);">No video files found<br><br>Supported formats: .mp4, .mkv, .avi, .ts, .mov</div>';
+                container.innerHTML = '<div style="text-align:center; padding:2rem; color:var(--text2);">未找到视频文件<br><br>支持的格式：.mp4, .mkv, .avi, .ts, .mov</div>';
                 return;
             }
             
@@ -539,63 +539,63 @@ INDEX_HTML = '''
                 document.getElementById('overview-content').innerHTML = `
                     <div style="display:grid; gap:1rem; grid-template-columns:repeat(2, 1fr);">
                         <div style="background: var(--bg); padding:1rem; border-radius:6px;">
-                            <div style="color:var(--text2); font-size:0.85rem;">Filename</div>
+                            <div style="color:var(--text2); font-size:0.85rem;">文件名</div>
                             <div style="font-weight:600;">${data.name || '-'}</div>
                         </div>
                         <div style="background: var(--bg); padding:1rem; border-radius:6px;">
-                            <div style="color:var(--text2); font-size:0.85rem;">Directory</div>
+                            <div style="color:var(--text2); font-size:0.85rem;">目录</div>
                             <div style="font-size:0.9rem; color:var(--text2);">${data.dir || '-'}</div>
                         </div>
                         <div style="background: var(--bg); padding:1rem; border-radius:6px;">
                             <div style="color:var(--text2); font-size:0.85rem;">NFO</div>
-                            <div>${data.hasNfo ? '<span class="badge success">✅ Present</span>' : '<span class="badge danger">❌ Missing</span>'}</div>
+                            <div>${data.hasNfo ? '<span class="badge success">✅ 存在</span>' : '<span class="badge danger">❌ 缺失</span>'}</div>
                         </div>
                         <div style="background: var(--bg); padding:1rem; border-radius:6px;">
                             <div style="color:var(--text2); font-size:0.85rem;">VSMETA</div>
-                            <div>${data.hasVsmeta ? '<span class="badge success">✅ Present</span>' : '<span class="badge warning">⏳ Missing</span>'}</div>
+                            <div>${data.hasVsmeta ? '<span class="badge success">✅ 存在</span>' : '<span class="badge warning">⏳ 缺失</span>'}</div>
                         </div>
                     </div>
                     <div style="display:grid; gap:1rem; grid-template-columns:repeat(2, 1fr); margin-top:1rem;">
                         <div style="background: var(--bg); padding:1rem; border-radius:6px;">
-                            <div style="color:var(--text2); font-size:0.85rem;">Poster</div>
-                            <div>${data.hasPoster ? '<span class="badge success">✅ Present</span>' : '<span class="badge warning">⏳ Missing</span>'}</div>
+                            <div style="color:var(--text2); font-size:0.85rem;">封面</div>
+                            <div>${data.hasPoster ? '<span class="badge success">✅ 存在</span>' : '<span class="badge warning">⏳ 缺失</span>'}</div>
                         </div>
                         <div style="background: var(--bg); padding:1rem; border-radius:6px;">
-                            <div style="color:var(--text2); font-size:0.85rem;">Fanart</div>
-                            <div>${data.hasFanart ? '<span class="badge success">✅ Present</span>' : '<span class="badge warning">⏳ Missing</span>'}</div>
+                            <div style="color:var(--text2); font-size:0.85rem;">背景图</div>
+                            <div>${data.hasFanart ? '<span class="badge success">✅ 存在</span>' : '<span class="badge warning">⏳ 缺失</span>'}</div>
                         </div>
                     </div>
                     ${data.metadata ? `
                         <div style="margin-top:1.5rem;">
-                            <h4 style="margin-bottom:0.75rem;">Metadata</h4>
+                            <h4 style="margin-bottom:0.75rem;">元数据</h4>
                             <div style="background: var(--bg); padding:1rem; border-radius:6px;">
-                                <div style="margin-bottom:0.5rem;"><strong>Title:</strong> ${data.metadata.title || '-'}</div>
-                                <div style="margin-bottom:0.5rem;"><strong>Year:</strong> ${data.metadata.year || '-'}</div>
-                                <div style="margin-bottom:0.5rem;"><strong>Rating:</strong> ${data.metadata.rating || '-'}</div>
-                                <div><strong>Plot:</strong> ${data.metadata.plot || '-'}</div>
+                                <div style="margin-bottom:0.5rem;"><strong>标题:</strong> ${data.metadata.title || '-'}</div>
+                                <div style="margin-bottom:0.5rem;"><strong>年份:</strong> ${data.metadata.year || '-'}</div>
+                                <div style="margin-bottom:0.5rem;"><strong>评分:</strong> ${data.metadata.rating || '-'}</div>
+                                <div><strong>简介:</strong> ${data.metadata.plot || '-'}</div>
                             </div>
                         </div>
                     ` : ''}
                 `;
                 
-                document.getElementById('nfo-content').textContent = data.nfoContent || 'No NFO content';
-                document.getElementById('compare-nfo').textContent = data.nfoContent || 'No NFO content';
+                document.getElementById('nfo-content').textContent = data.nfoContent || '无 NFO 内容';
+                document.getElementById('compare-nfo').textContent = data.nfoContent || '无 NFO 内容';
                 
-                document.getElementById('vsmeta-content').textContent = data.vsmetaContent || 'No VSMETA content';
-                document.getElementById('compare-vsmeta').textContent = data.vsmetaContent || 'No VSMETA content';
+                document.getElementById('vsmeta-content').textContent = data.vsmetaContent || '无 VSMETA 内容';
+                document.getElementById('compare-vsmeta').textContent = data.vsmetaContent || '无 VSMETA 内容';
                 
                 const posterContainer = document.getElementById('poster-container');
                 if (data.posterUrl) {
-                    posterContainer.innerHTML = `<img src="${data.posterUrl}" alt="Poster" onclick="window.open('${data.posterUrl}', '_blank')" style="cursor: zoom-in;">`;
+                    posterContainer.innerHTML = `<img src="${data.posterUrl}" alt="封面" onclick="window.open('${data.posterUrl}', '_blank')" style="cursor: zoom-in;">`;
                 } else {
-                    posterContainer.innerHTML = '<div class="image-placeholder">No poster image</div>';
+                    posterContainer.innerHTML = '<div class="image-placeholder">无封面图片</div>';
                 }
                 
                 const fanartContainer = document.getElementById('fanart-container');
                 if (data.fanartUrl) {
-                    fanartContainer.innerHTML = `<img src="${data.fanartUrl}" alt="Fanart" onclick="window.open('${data.fanartUrl}', '_blank')" style="cursor: zoom-in;">`;
+                    fanartContainer.innerHTML = `<img src="${data.fanartUrl}" alt="背景图" onclick="window.open('${data.fanartUrl}', '_blank')" style="cursor: zoom-in;">`;
                 } else {
-                    fanartContainer.innerHTML = '<div class="image-placeholder">No fanart image</div>';
+                    fanartContainer.innerHTML = '<div class="image-placeholder">无背景图片</div>';
                 }
                 
             } catch (e) {
@@ -614,7 +614,7 @@ INDEX_HTML = '''
                 
                 const pct = p.total > 0 ? Math.round((p.completed / p.total) * 100) : 0;
                 document.getElementById('progress-fill').style.width = pct + '%';
-                document.getElementById('progress-text').textContent = p.currentFile ? `Converting: ${p.currentFile} (${p.completed}/${p.total})` : 'Waiting...';
+                document.getElementById('progress-text').textContent = p.currentFile ? `正在转换: ${p.currentFile} (${p.completed}/${p.total})` : '等待中...';
                 
                 document.getElementById('btn-start').style.display = data.is_running ? 'none' : 'inline-block';
                 document.getElementById('btn-stop').style.display = data.is_running ? 'inline-block' : 'none';
@@ -650,7 +650,7 @@ INDEX_HTML = '''
                 
                 const container = document.getElementById('log-box');
                 if (!logs.length) {
-                    container.innerHTML = '<div>No logs</div>';
+                    container.innerHTML = '<div>无日志</div>';
                     return;
                 }
                 
@@ -670,7 +670,7 @@ INDEX_HTML = '''
         async function clearLogs() {
             try {
                 await api('/api/logs', 'DELETE');
-                document.getElementById('log-box').innerHTML = '<div>No logs</div>';
+                document.getElementById('log-box').innerHTML = '<div>无日志</div>';
             } catch (e) {
                 console.error(e);
             }
@@ -711,7 +711,7 @@ if HAS_FLASK:
         files = scan_directory(directory)
         _state['scan_results'] = files
         _state['progress']['total'] = len(files)
-        _add_log('info', f'Scan complete, found {len(files)} video files')
+        _add_log('info', f'扫描完成，找到 {len(files)} 个视频文件')
         return jsonify({'files': files})
     
     
@@ -771,7 +771,7 @@ if HAS_FLASK:
     @app.route('/api/convert/stop', methods=['POST'])
     def api_convert_stop():
         _state['is_running'] = False
-        _add_log('info', 'Conversion stopped')
+        _add_log('info', '转换已停止')
         return jsonify({'success': True})
 
 
@@ -804,7 +804,7 @@ for dirname, filename in files:
 '''
         ]
         
-        _add_log('info', 'Starting conversion...')
+        _add_log('info', '开始转换...')
         
         process = subprocess.Popen(
             cmd,
@@ -831,10 +831,10 @@ for dirname, filename in files:
         files = scan_directory(directory)
         _state['scan_results'] = files
         
-        _add_log('success', f'Conversion complete! Success: {_state["progress"]["success"]}, Failed: {_state["progress"]["failed"]}')
+        _add_log('success', f'转换完成！成功: {_state["progress"]["success"]}, 失败: {_state["progress"]["failed"]}')
         
     except Exception as e:
-        _add_log('error', f'Conversion failed: {str(e)}')
+        _add_log('error', f'转换失败: {str(e)}')
     finally:
         _state['is_running'] = False
         _state['progress']['current_file'] = ''
@@ -843,7 +843,7 @@ for dirname, filename in files:
 def scan_directory(directory):
     results = []
     if not os.path.exists(directory):
-        _add_log('warning', f'Directory not found: {directory}')
+        _add_log('warning', f'目录未找到: {directory}')
         return results
     
     try:
@@ -858,13 +858,13 @@ def scan_directory(directory):
                     
                     if has_nfo and has_vsmeta:
                         status_class = 'success'
-                        status_text = 'Converted'
+                        status_text = '已转换'
                     elif has_nfo:
                         status_class = 'warning'
-                        status_text = 'Pending'
+                        status_text = '待转换'
                     else:
                         status_class = 'danger'
-                        status_text = 'No NFO'
+                        status_text = '无NFO'
                     
                     results.append({
                         'name': filename,
@@ -876,7 +876,7 @@ def scan_directory(directory):
                         'statusText': status_text
                     })
     except Exception as e:
-        _add_log('error', f'Scan failed: {e}')
+        _add_log('error', f'扫描失败: {e}')
     
     return results
 
@@ -1008,19 +1008,19 @@ def parse_nfo_metadata(nfo_path):
 
 def main():
     if not HAS_FLASK:
-        print('Please install Flask first: pip install flask')
+        print('请先安装 Flask：pip install flask')
         return
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('--host', default='0.0.0.0', help='Host address')
-    parser.add_argument('--port', type=int, default=8004, help='Port number')
+    parser.add_argument('--host', default='0.0.0.0', help='监听地址')
+    parser.add_argument('--port', type=int, default=8004, help='端口号')
     args = parser.parse_args()
     
     print(f'''
 ╔══════════════════════════════════════════╗
-║   NFO to VSMETA Converter Web UI        ║
+║   NFO 转 VSMETA 转换器 Web UI        ║
 ╠══════════════════════════════════════════╣
-║   Access: http://localhost:{args.port:<5}    ║
+║   访问地址: http://localhost:{args.port:<5}    ║
 ╚══════════════════════════════════════════╝
     ''')
     
