@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-NFO to VSMETA 转换器 - 稳定增强版
-=====================================
-真正调用转换器，生成VSMETA文件
+NFO to VSMETA 转换器 - 修复signal问题版
+=========================================
+修复子线程调用转换器的signal错误
 """
 
 import argparse
@@ -39,6 +39,9 @@ _state = {
     "logs": []
 }
 
+_converter = None
+_config = None
+
 
 def _add_log(level: str, message: str):
     entry = {
@@ -51,13 +54,43 @@ def _add_log(level: str, message: str):
         _state["logs"] = _state["logs"][-1000:]
 
 
+def init_converter_in_main_thread():
+    """在主线程中初始化转换器，避免signal错误"""
+    global _converter, _config
+    try:
+        from nfo_to_vsmeta_converter_complete import NFOToVSMETAConverter, Config
+        
+        _add_log('info', '正在初始化转换器...')
+        
+        # 创建配置
+        _config = Config()
+        _config.directory = _state['scan_results'][0]['dir'] if _state['scan_results'] else '/workspace/test_movies'
+        _config.max_workers = 4
+        _config.overwrite_existing = True
+        _config.enable_backup = True
+        _config.enable_safe_write = False
+        _config.disable_signals = True
+        
+        # 创建转换器
+        _converter = NFOToVSMETAConverter(_config)
+        _add_log('success', '转换器初始化成功')
+        return True
+        
+    except ImportError as e:
+        _add_log('error', f'无法导入转换器: {str(e)}')
+        return False
+    except Exception as e:
+        _add_log('error', f'转换器初始化失败: {str(e)}')
+        return False
+
+
 INDEX_HTML = '''
 <!DOCTYPE html>
 <html lang="zh-CN" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NFO to VSMETA - 真正转换版</title>
+    <title>NFO to VSMETA - 修复版</title>
     <style>
         :root {
             --bg: #0d1117;
@@ -265,11 +298,20 @@ INDEX_HTML = '''
             margin-bottom: 1rem;
             color: var(--warning);
         }
+        
+        .success-alert {
+            background: rgba(63, 185, 80, 0.1);
+            border: 1px solid var(--success);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            color: var(--success);
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <div class="logo">🎬 NFO → VSMETA (真正转换版)</div>
+        <div class="logo">🎬 NFO → VSMETA (修复版)</div>
         <button class="btn" onclick="toggleTheme()">🌙 主题</button>
     </div>
     
@@ -380,6 +422,10 @@ INDEX_HTML = '''
             ⚠️ 重要提示：转换前请确保目录中有NFO文件，否则无法生成VSMETA文件！
         </div>
         
+        <div class="success-alert" id="converter-status" style="display: none;">
+            ✅ 转换器已就绪，可以开始转换
+        </div>
+        
         <div class="card">
             <h3 style="margin-bottom: 1rem;">转换设置</h3>
             <div style="margin-bottom: 1rem;">
@@ -401,7 +447,8 @@ INDEX_HTML = '''
                 </div>
             </div>
             <div>
-                <button class="btn btn-primary" id="btn-start" onclick="startConversion()">▶️ 开始转换</button>
+                <button class="btn" id="btn-init" onclick="initConverter()">⚙️ 初始化转换器</button>
+                <button class="btn btn-primary" id="btn-start" onclick="startConversion()" disabled>▶️ 开始转换</button>
                 <button class="btn btn-danger" id="btn-stop" onclick="stopConversion()" style="display:none;">⏹️ 停止转换</button>
             </div>
         </div>
@@ -409,10 +456,10 @@ INDEX_HTML = '''
         <div class="card" style="margin-top: 1rem;">
             <h3 style="margin-bottom: 0.75rem;">转换说明</h3>
             <div style="color: var(--text2); line-height: 1.8;">
-                <p>1. 确保处理目录中有NFO文件</p>
-                <p>2. 点击「开始转换」将调用真正的转换器</p>
-                <p>3. 转换后的VSMETA文件将保存在同一目录</p>
-                <p>4. 可在「文件管理」中查看转换结果</p>
+                <p>1. 点击「⚙️ 初始化转换器」按钮</p>
+                <p>2. 等待转换器初始化完成（会显示绿色提示）</p>
+                <p>3. 点击「▶️ 开始转换」开始转换</p>
+                <p>4. 转换后的VSMETA文件将保存在同一目录</p>
             </div>
         </div>
     </div>
@@ -577,6 +624,29 @@ INDEX_HTML = '''
             }
         }
         
+        async function initConverter() {
+            document.getElementById('converter-status').style.display = 'none';
+            document.getElementById('btn-init').textContent = '⚙️ 初始化中...';
+            document.getElementById('btn-init').disabled = true;
+            
+            try {
+                const result = await api('/api/init-converter', 'POST');
+                document.getElementById('btn-init').disabled = false;
+                document.getElementById('btn-init').textContent = '⚙️ 初始化转换器';
+                
+                if (result.success) {
+                    document.getElementById('converter-status').style.display = 'block';
+                    document.getElementById('btn-start').disabled = false;
+                } else {
+                    alert('转换器初始化失败: ' + (result.error || '未知错误'));
+                }
+            } catch (e) {
+                document.getElementById('btn-init').disabled = false;
+                document.getElementById('btn-init').textContent = '⚙️ 初始化转换器';
+                console.error(e);
+            }
+        }
+        
         async function startConversion() {
             try {
                 await api('/api/convert/start', 'POST', {
@@ -684,10 +754,23 @@ def api_logs():
     return jsonify({'logs': _state['logs']})
 
 
+@app.route('/api/init-converter', methods=['POST'])
+def api_init_converter():
+    """在主线程中初始化转换器"""
+    success = init_converter_in_main_thread()
+    if success:
+        return jsonify({'success': True})
+    else:
+        return jsonify({'success': False, 'error': '转换器初始化失败'})
+
+
 @app.route('/api/convert/start', methods=['POST'])
 def api_convert_start():
     if _state['is_running']:
         return jsonify({'success': False, 'error': '转换进行中'})
+    
+    if _converter is None:
+        return jsonify({'success': False, 'error': '请先初始化转换器'})
     
     _state['is_running'] = True
     _state['progress']['completed'] = 0
@@ -695,7 +778,7 @@ def api_convert_start():
     _state['progress']['failed'] = 0
     _state['progress']['current_file'] = ''
     
-    threading.Thread(target=run_real_conversion, daemon=True).start()
+    threading.Thread(target=run_conversion_with_converter, daemon=True).start()
     return jsonify({'success': True})
 
 
@@ -706,85 +789,63 @@ def api_convert_stop():
     return jsonify({'success': True})
 
 
-def run_real_conversion():
-    """真正调用转换器，生成VSMETA文件"""
-    try:
-        from nfo_to_vsmeta_converter_complete import NFOToVSMETAConverter, Config
+def run_conversion_with_converter():
+    """使用已初始化的转换器进行转换"""
+    global _converter
+    
+    total = len(_state['scan_results'])
+    _state['progress']['total'] = total
+    
+    for idx, file_info in enumerate(_state['scan_results']):
+        if not _state['is_running']:
+            _add_log('warning', '转换任务被用户停止')
+            break
         
-        _add_log('info', '正在初始化转换器...')
+        filepath = file_info['path']
+        directory = file_info['dir']
+        filename = file_info['name']
         
-        # 创建配置
-        config = Config()
-        config.directory = _state['scan_results'][0]['dir'] if _state['scan_results'] else '/workspace/test_movies'
-        config.max_workers = 4
-        config.overwrite_existing = True
-        config.enable_backup = True
+        _state['progress']['current_file'] = filename
+        _state['progress']['completed'] = idx + 1
         
-        # 创建转换器
-        converter = NFOToVSMETAConverter(config)
-        _add_log('success', '转换器初始化成功')
+        _add_log('info', f'正在转换: {filename}')
         
-        total = len(_state['scan_results'])
-        _state['progress']['total'] = total
+        # 检查是否有NFO文件
+        base = filepath.rsplit('.', 1)[0]
+        nfo_path = base + '.nfo'
         
-        for idx, file_info in enumerate(_state['scan_results']):
-            if not _state['is_running']:
-                _add_log('warning', '转换任务被用户停止')
-                break
+        if not os.path.exists(nfo_path):
+            _state['progress']['failed'] += 1
+            _add_log('warning', f'⏭️ 跳过: {filename} (无NFO文件)')
+            continue
+        
+        try:
+            # 调用转换器
+            result = _converter._process_single_file(directory, filename)
             
-            filepath = file_info['path']
-            directory = file_info['dir']
-            filename = file_info['name']
-            
-            _state['progress']['current_file'] = filename
-            _state['progress']['completed'] = idx + 1
-            
-            _add_log('info', f'正在转换: {filename}')
-            
-            # 检查是否有NFO文件
-            base = filepath.rsplit('.', 1)[0]
-            nfo_path = base + '.nfo'
-            
-            if not os.path.exists(nfo_path):
-                _state['progress']['failed'] += 1
-                _add_log('warning', f'⏭️ 跳过: {filename} (无NFO文件)')
-                continue
-            
-            try:
-                # 调用真正的转换函数
-                result = converter._process_single_file(directory, filename)
+            if result.get('success'):
+                _state['progress']['success'] += 1
+                _add_log('success', f'✅ 转换成功: {filename}')
                 
-                if result.get('success'):
-                    _state['progress']['success'] += 1
-                    _add_log('success', f'✅ 转换成功: {filename}')
-                    
-                    # 更新文件状态
-                    _state['scan_results'][idx]['hasVsmeta'] = True
-                    _state['scan_results'][idx]['statusClass'] = 'success'
-                    _state['scan_results'][idx]['statusText'] = '已转换'
-                else:
-                    _state['progress']['failed'] += 1
-                    error_msg = result.get('error', '未知错误')
-                    _add_log('error', f'❌ 转换失败: {filename} - {error_msg}')
-                    
-            except Exception as e:
+                # 更新文件状态
+                _state['scan_results'][idx]['hasVsmeta'] = True
+                _state['scan_results'][idx]['statusClass'] = 'success'
+                _state['scan_results'][idx]['statusText'] = '已转换'
+            else:
                 _state['progress']['failed'] += 1
-                _add_log('error', f'❌ 处理异常: {filename} - {str(e)}')
-        
-        _state['is_running'] = False
-        _state['progress']['current_file'] = ''
-        
-        success_count = _state['progress']['success']
-        fail_count = _state['progress']['failed']
-        _add_log('success', f'🎉 转换完成！成功: {success_count}, 失败: {fail_count}')
-        
-    except ImportError as e:
-        _state['is_running'] = False
-        _add_log('error', f'❌ 无法导入转换器: {str(e)}')
-        _add_log('error', '请确保 nfo_to_vsmeta_converter_complete.py 文件存在')
-    except Exception as e:
-        _state['is_running'] = False
-        _add_log('error', f'❌ 转换器错误: {str(e)}')
+                error_msg = result.get('error', '未知错误')
+                _add_log('error', f'❌ 转换失败: {filename} - {error_msg}')
+                
+        except Exception as e:
+            _state['progress']['failed'] += 1
+            _add_log('error', f'❌ 处理异常: {filename} - {str(e)}')
+    
+    _state['is_running'] = False
+    _state['progress']['current_file'] = ''
+    
+    success_count = _state['progress']['success']
+    fail_count = _state['progress']['failed']
+    _add_log('success', f'🎉 转换完成！成功: {success_count}, 失败: {fail_count}')
 
 
 def scan_directory(directory):
@@ -908,7 +969,7 @@ def main():
     
     print(f'''
 ╔══════════════════════════════════════════╗
-║   NFO → VSMETA (真正转换版)        ║
+║   NFO → VSMETA (修复signal错误版)  ║
 ╠══════════════════════════════════════════╣
 ║   访问地址: http://localhost:{args.port:<5}    ║
 ╚══════════════════════════════════════════╝
