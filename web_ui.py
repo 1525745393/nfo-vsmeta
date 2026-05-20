@@ -506,6 +506,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
             <div class="tabs">
                 <button class="tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 仪表盘</button>
                 <button class="tab" data-tab="simple" onclick="switchTab('simple')">✨ 极简模式</button>
+                <button class="tab" data-tab="pro" onclick="switchTab('pro')">🎯 专业模式</button>
                 <button class="tab" data-tab="config" onclick="switchTab('config')">⚙️ 配置</button>
                 <button class="tab" data-tab="smart" onclick="switchTab('smart')">🤖 智能助手</button>
                 <button class="tab" data-tab="convert" onclick="switchTab('convert')">🚀 转换</button>
@@ -990,6 +991,175 @@ INDEX_HTML = r"""<!DOCTYPE html>
                 </div>
             </div>
             
+
+            <!-- ========== 专业模式 ========== -->
+            <div class="page" id="page-pro">
+                <style>
+                    .pro-container{display:flex;flex-direction:column;height:calc(100vh - 120px)}
+                    .pro-toolbar{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+                    .pro-toolbar-section{display:flex;gap:12px;align-items:center;flex:1;min-width:250px}
+                    .pro-toolbar-section label{font-size:12px;color:var(--text-muted);margin-bottom:0}
+                    .pro-toolbar-section input,.pro-toolbar-section select{padding:8px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:13px}
+                    .pro-toolbar-actions{display:flex;gap:8px}
+                    .pro-main{display:grid;grid-template-columns:280px 1fr 300px;gap:12px;flex:1;min-height:0}
+                    .pro-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
+                    .pro-panel-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+                    .pro-panel-header h3{font-size:14px;font-weight:600;margin:0}
+                    .pro-panel-content{flex:1;overflow:auto;padding:12px}
+                    .file-tree-item{padding:10px 12px;border-radius:8px;cursor:pointer;margin-bottom:4px;transition:all .2s;border:2px solid transparent;display:flex;align-items:center;gap:10px}
+                    .file-tree-item:hover{background:var(--bg-input)}
+                    .file-tree-item.active{border-color:var(--accent);background:rgba(59,130,246,.08)}
+                    .file-tree-item .status-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+                    .file-tree-item .status-dot.success{background:var(--success)}
+                    .file-tree-item .status-dot.warning{background:var(--warning)}
+                    .file-tree-item .status-dot.error{background:var(--danger)}
+                    .file-tree-item .filename{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+                    .file-tree-item .file-meta{font-size:11px;color:var(--text-muted)}
+                    .diff-container{display:grid;grid-template-columns:1fr 1fr;gap:16px;height:100%}
+                    .diff-panel{background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:16px;overflow:auto}
+                    .diff-panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+                    .diff-panel-title{font-size:13px;font-weight:600;color:var(--text-primary)}
+                    .diff-item{margin-bottom:12px;padding:10px;background:var(--bg-card);border-radius:6px}
+                    .diff-item-label{font-size:11px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+                    .diff-item-values{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+                    .diff-value{font-size:12px;padding:6px 8px;background:var(--bg-input);border-radius:4px;font-family:'JetBrains Mono',monospace;word-break:break-all}
+                    .diff-value.original{color:var(--info)}
+                    .diff-value.generated{color:var(--success)}
+                    .diff-value.missing{color:var(--danger);background:rgba(239,68,68,.1)}
+                    .diff-value.truncated{color:var(--warning);background:rgba(245,158,11,.1)}
+                    .validation-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:12px;font-size:11px;font-weight:500}
+                    .validation-badge.pass{background:rgba(34,197,94,.15);color:var(--success)}
+                    .validation-badge.fail{background:rgba(239,68,68,.15);color:var(--danger)}
+                    .validation-badge.warn{background:rgba(245,158,11,.15);color:var(--warning)}
+                    .log-stream{font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.8;max-height:100%;overflow-y:auto}
+                    .log-entry{padding:4px 0;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:flex-start}
+                    .log-entry .timestamp{color:var(--text-muted);flex-shrink:0;font-size:10px}
+                    .log-entry .level{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;flex-shrink:0}
+                    .log-entry .level.info{background:rgba(59,130,246,.15);color:var(--info)}
+                    .log-entry .level.warn{background:rgba(245,158,11,.15);color:var(--warning)}
+                    .log-entry .level.error{background:rgba(239,68,68,.15);color:var(--danger)}
+                    .log-entry .level.success{background:rgba(34,197,94,.15);color:var(--success)}
+                    .log-entry .message{flex:1;word-break:break-all}
+                    .log-entry.clickable{cursor:pointer}
+                    .log-entry.clickable:hover{background:var(--bg-input)}
+                    .stats-bar{display:flex;gap:16px;padding:8px 12px;background:var(--bg-input);border-radius:8px;font-size:12px}
+                    .stat-item{display:flex;align-items:center;gap:6px}
+                    .stat-item .label{color:var(--text-muted)}
+                    .stat-item .value{font-weight:600;color:var(--text-primary)}
+                    .stat-item .value.success{color:var(--success)}
+                    .stat-item .value.error{color:var(--danger)}
+                    .stat-item .value.warning{color:var(--warning)}
+                    .export-btn{padding:6px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);cursor:pointer;font-size:12px;transition:all .2s}
+                    .export-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+                </style>
+                <div class="pro-container">
+                    <!-- 顶部工具栏 -->
+                    <div class="pro-toolbar">
+                        <div class="pro-toolbar-section">
+                            <label>源目录</label>
+                            <input type="text" id="proSourceDir" value="/workspace/test_movies" style="width:200px" placeholder="/path/to/nfo">
+                            <label>输出目录</label>
+                            <input type="text" id="proOutputDir" value="/workspace/test_movies" style="width:200px" placeholder="/path/to/vsmeta">
+                        </div>
+                        <div class="pro-toolbar-section">
+                            <label>媒体类型</label>
+                            <select id="proMediaType" style="width:120px">
+                                <option value="movie">电影</option>
+                                <option value="tvshow">电视剧</option>
+                            </select>
+                        </div>
+                        <div class="pro-toolbar-section">
+                            <label>冲突处理</label>
+                            <select id="proConflictMode" style="width:140px">
+                                <option value="skip">跳过</option>
+                                <option value="overwrite">覆盖</option>
+                                <option value="backup">备份旧文件</option>
+                            </select>
+                        </div>
+                        <div class="pro-toolbar-actions">
+                            <button class="btn btn-primary" id="proStartBtn" onclick="proStartConversion()">▶ 开始转换</button>
+                            <button class="btn btn-danger" id="proStopBtn" onclick="proStopConversion()" style="display:none">⏹ 停止</button>
+                            <button class="btn" onclick="proScanFiles()">🔍 扫描</button>
+                            <button class="export-btn" onclick="proExportReport()">📥 导出报告</button>
+                        </div>
+                    </div>
+
+                    <!-- 统计栏 -->
+                    <div class="stats-bar" style="margin-bottom:12px">
+                        <div class="stat-item">
+                            <span class="label">总文件:</span>
+                            <span class="value" id="proStatTotal">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="label">成功:</span>
+                            <span class="value success" id="proStatSuccess">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="label">失败:</span>
+                            <span class="value error" id="proStatFailed">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="label">跳过:</span>
+                            <span class="value warning" id="proStatSkipped">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="label">耗时:</span>
+                            <span class="value" id="proStatTime">0s</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="label">压缩节省:</span>
+                            <span class="value" id="proStatSaved">0%</span>
+                        </div>
+                    </div>
+
+                    <!-- 三栏主区域 -->
+                    <div class="pro-main">
+                        <!-- 左栏：文件树 -->
+                        <div class="pro-panel">
+                            <div class="pro-panel-header">
+                                <h3>📁 文件列表</h3>
+                                <span id="proFileCount" style="font-size:12px;color:var(--text-muted)">0 个文件</span>
+                            </div>
+                            <div class="pro-panel-content" id="proFileTree">
+                                <div class="empty-state">
+                                    <div class="icon">📂</div>
+                                    <p>点击"扫描"加载文件</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 中栏：元数据对比 -->
+                        <div class="pro-panel">
+                            <div class="pro-panel-header">
+                                <h3>🔄 元数据对比</h3>
+                                <div id="proValidationStatus"></div>
+                            </div>
+                            <div class="pro-panel-content" id="proDiffView">
+                                <div class="empty-state">
+                                    <div class="icon">📊</div>
+                                    <p>选择文件查看对比</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 右栏：实时日志 -->
+                        <div class="pro-panel">
+                            <div class="pro-panel-header">
+                                <h3>📡 实时日志</h3>
+                                <button class="export-btn" onclick="proClearLogs()" style="padding:4px 8px;font-size:11px">清除</button>
+                            </div>
+                            <div class="pro-panel-content">
+                                <div class="log-stream" id="proLogStream">
+                                    <div style="color:var(--text-muted);padding:20px;text-align:center">等待日志...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+
             <!-- ========== 可视化对比 ========== -->
             <div class="page" id="page-visual">
                 <div class="card" style="padding:10px;margin-bottom:10px">
@@ -1029,7 +1199,242 @@ INDEX_HTML = r"""<!DOCTYPE html>
     <script>
         let csrfToken='';const SAFE_LEVELS=new Set(['info','warning','error','success','debug']);
 
-        function switchTab(name){document.querySelectorAll('.tab').forEach(t=>{t.classList.toggle('active',t.dataset.tab===name)});document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));const page=document.getElementById('page-'+name);if(page)page.classList.add('active');if(name==='convert')refreshScanResults();if(name==='checkpoint')refreshCheckpoint();if(name==='backup')refreshBackups();if(name==='visual'){startVisualMonitor()}}
+        function switchTab(name){document.querySelectorAll('.tab').forEach(t=>{t.classList.toggle('active',t.dataset.tab===name)});document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));const page=document.getElementById('page-'+name);if(page)page.classList.add('active');if(name==='convert')refreshScanResults();if(name==='checkpoint')refreshCheckpoint();if(name==='backup')refreshBackups();if(name==='visual'){startVisualMonitor()};if(name==='pro'){proStartPolling()}}
+
+
+        // === 专业模式 ===
+        let proPollTimer=null;
+        let proSelectedFile=null;
+        let proFiles=[];
+        let proStartTime=null;
+
+        async function proScanFiles(){
+            const sourceDir=document.getElementById('proSourceDir').value;
+            const outputDir=document.getElementById('proOutputDir').value;
+            if(!sourceDir){
+                showToast('请输入源目录','warning');
+                return;
+            }
+            showToast('扫描中...','info');
+            try{
+                const data=await api('/api/pro/scan','POST',{source_dir:sourceDir,output_dir:outputDir});
+                proFiles=data.files||[];
+                document.getElementById('proFileCount').textContent=proFiles.length+' 个文件';
+                document.getElementById('proStatTotal').textContent=proFiles.length;
+                proRenderFileTree();
+                showToast('扫描完成，找到 '+proFiles.length+' 个文件','success');
+            }catch(e){
+                showToast('扫描失败: '+e.message,'error');
+            }
+        }
+
+        function proRenderFileTree(){
+            const container=document.getElementById('proFileTree');
+            if(proFiles.length===0){
+                container.innerHTML='<div class="empty-state"><div class="icon">📂</div><p>没有找到视频文件</p></div>';
+                return;
+            }
+            container.innerHTML=proFiles.map((f,idx)=>{
+                const statusClass=f.status||'warning';
+                const statusText={success:'成功',warning:'警告',error:'失败'}[statusClass]||'未知';
+                return '<div class="file-tree-item '+(proSelectedFile===f.path?'active':'')+'" onclick="proSelectFile('+idx+')"><div class="status-dot '+statusClass+'"></div><div style="flex:1;min-width:0"><div class="filename">'+escHtml(f.name)+'</div><div class="file-meta">'+escHtml(f.directory||'')+'</div></div></div>';
+            }).join('');
+        }
+
+        async function proSelectFile(idx){
+            proSelectedFile=proFiles[idx].path;
+            proRenderFileTree();
+            try{
+                const data=await api('/api/pro/file-detail','POST',{filepath:proSelectedFile});
+                proRenderDiff(data);
+            }catch(e){
+                showToast('获取详情失败: '+e.message,'error');
+            }
+        }
+
+        function proRenderDiff(data){
+            const container=document.getElementById('proDiffView');
+            const validation=[];
+            let html='<div style="display:flex;flex-direction:column;gap:12px;height:100%">';
+            
+            // 文件基本信息
+            html+='<div style="background:var(--bg-input);border-radius:8px;padding:16px">';
+            html+='<div style="font-size:15px;font-weight:600;margin-bottom:12px">'+escHtml(data.filename)+'</div>';
+            html+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
+            html+='<span class="validation-badge '+(data.has_nfo?'pass':'fail')+'">'+(data.has_nfo?'✓':'✗')+' NFO</span>';
+            html+='<span class="validation-badge '+(data.has_vsmeta?'pass':'fail')+'">'+(data.has_vsmeta?'✓':'✗')+' VSMETA</span>';
+            html+='<span class="validation-badge '+(data.has_poster?'pass':'fail')+'">'+(data.has_poster?'✓':'✗')+' 海报</span>';
+            html+='<span class="validation-badge '+(data.has_backdrop?'pass':'fail')+'">'+(data.has_backdrop?'✓':'✗')+' 背景图</span>';
+            html+='</div></div>';
+            
+            if(data.nfo_metadata&&data.vsmeta_metadata){
+                const nfo=data.nfo_metadata;
+                const vsmeta=data.vsmeta_metadata;
+                
+                // 对比表格
+                const fields=[
+                    {label:'标题',nfo:nfo.title,vsmeta:vsmeta.title,key:'title'},
+                    {label:'年份',nfo:nfo.year,vsmeta:vsmeta.year,key:'year'},
+                    {label:'评分',nfo:nfo.rating,vsmeta:vsmeta.rating,key:'rating'},
+                    {label:'类型',nfo:(nfo.genres||[]).join(', '),vsmeta:(vsmeta.genres||[]).join(', '),key:'genres'},
+                    {label:'导演',nfo:(nfo.directors||[]).join(', '),vsmeta:(vsmeta.directors||[]).join(', '),key:'directors'},
+                ];
+                
+                html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1;min-height:0;overflow:auto">';
+                html+='<div style="background:var(--bg-input);border-radius:8px;padding:12px;overflow:auto">';
+                html+='<div style="font-size:12px;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📄 原始 NFO</div>';
+                fields.forEach(field=>{
+                    const isSame=String(field.nfo||'')===String(field.vsmeta||'');
+                    const cls=isSame?'generated':'missing';
+                    html+='<div style="margin-bottom:8px"><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px">'+field.label+'</div><div class="diff-value original '+cls+'" style="font-size:12px">'+escHtml(String(field.nfo||'N/A'))+'</div></div>';
+                });
+                html+='</div>';
+                
+                html+='<div style="background:var(--bg-input);border-radius:8px;padding:12px;overflow:auto">';
+                html+='<div style="font-size:12px;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">📦 生成 VSMETA</div>';
+                fields.forEach(field=>{
+                    const isSame=String(field.nfo||'')===String(field.vsmeta||'');
+                    const cls=isSame?'generated':'missing';
+                    html+='<div style="margin-bottom:8px"><div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px">'+field.label+'</div><div class="diff-value generated '+cls+'" style="font-size:12px">'+escHtml(String(field.vsmeta||'N/A'))+'</div></div>';
+                });
+                html+='</div></div>';
+            }else{
+                html+='<div class="empty-state"><div class="icon">📊</div><p>无法对比：缺少元数据</p></div>';
+            }
+            
+            html+='</div>';
+            container.innerHTML=html;
+        }
+
+        async function proStartConversion(){
+            const sourceDir=document.getElementById('proSourceDir').value;
+            const outputDir=document.getElementById('proOutputDir').value;
+            const mediaType=document.getElementById('proMediaType').value;
+            const conflictMode=document.getElementById('proConflictMode').value;
+            
+            if(!sourceDir){
+                showToast('请输入源目录','warning');
+                return;
+            }
+            
+            document.getElementById('proStartBtn').style.display='none';
+            document.getElementById('proStopBtn').style.display='';
+            proStartTime=Date.now();
+            
+            try{
+                const data=await api('/api/pro/start','POST',{
+                    source_dir:sourceDir,
+                    output_dir:outputDir,
+                    media_type:mediaType,
+                    conflict_mode:conflictMode
+                });
+                proPollTimer=setInterval(proPollStatus,500);
+                showToast('转换已启动','success');
+                proAddLog('info','转换任务已启动');
+            }catch(e){
+                showToast('启动失败: '+e.message,'error');
+                document.getElementById('proStartBtn').style.display='';
+                document.getElementById('proStopBtn').style.display='none';
+            }
+        }
+
+        async function proStopConversion(){
+            try{
+                await api('/api/pro/stop','POST',{});
+                if(proPollTimer){
+                    clearInterval(proPollTimer);
+                    proPollTimer=null;
+                }
+                document.getElementById('proStartBtn').style.display='';
+                document.getElementById('proStopBtn').style.display='none';
+                showToast('转换已停止','warning');
+                proAddLog('warn','用户停止了转换任务');
+            }catch(e){
+                showToast('停止失败: '+e.message,'error');
+            }
+        }
+
+        async function proPollStatus(){
+            try{
+                const data=await api('/api/status');
+                const p=data.progress||{};
+                document.getElementById('proStatSuccess').textContent=p.success||0;
+                document.getElementById('proStatFailed').textContent=p.failed||0;
+                document.getElementById('proStatSkipped').textContent=p.skipped||0;
+                
+                if(proStartTime){
+                    const elapsed=Math.round((Date.now()-proStartTime)/1000);
+                    document.getElementById('proStatTime').textContent=elapsed+'s';
+                }
+                
+                if(!data.is_running&&proPollTimer){
+                    clearInterval(proPollTimer);
+                    proPollTimer=null;
+                    document.getElementById('proStartBtn').style.display='';
+                    document.getElementById('proStopBtn').style.display='none';
+                    showToast('转换完成！','success');
+                    proAddLog('success','转换任务已完成');
+                    proScanFiles();
+                }
+            }catch(e){
+                console.error(e);
+            }
+        }
+
+        function proStartPolling(){
+            if(proPollTimer)return;
+            proPollTimer=setInterval(async()=>{
+                try{
+                    const data=await api('/api/logs');
+                    if(data.logs&&data.logs.length>0){
+                        const recent=data.logs.slice(-10);
+                        proUpdateLogStream(recent);
+                    }
+                }catch(e){
+                    console.error(e);
+                }
+            },2000);
+        }
+
+        function proAddLog(level,message){
+            const timestamp=new Date().toLocaleTimeString();
+            const container=document.getElementById('proLogStream');
+            const entry=document.createElement('div');
+            entry.className='log-entry';
+            entry.innerHTML='<span class="timestamp">'+timestamp+'</span><span class="level '+level+'">'+level.toUpperCase()+'</span><span class="message">'+escHtml(message)+'</span>';
+            container.appendChild(entry);
+            container.scrollTop=container.scrollHeight;
+        }
+
+        function proUpdateLogStream(logs){
+            const container=document.getElementById('proLogStream');
+            container.innerHTML=logs.map(log=>{
+                const time=new Date(log.time||Date.now()).toLocaleTimeString();
+                return '<div class="log-entry"><span class="timestamp">'+time+'</span><span class="level '+log.level+'">'+log.level.toUpperCase()+'</span><span class="message">'+escHtml(log.message||'')+'</span></div>';
+            }).join('');
+            container.scrollTop=container.scrollHeight;
+        }
+
+        function proClearLogs(){
+            document.getElementById('proLogStream').innerHTML='<div style="color:var(--text-muted);padding:20px;text-align:center">日志已清除</div>';
+        }
+
+        async function proExportReport(){
+            try{
+                const data=await api('/api/pro/report','POST',{});
+                const blob=new Blob([data.csv],{type:'text/csv;charset=utf-8'});
+                const url=URL.createObjectURL(blob);
+                const a=document.createElement('a');
+                a.href=url;
+                a.download='conversion_report_'+new Date().toISOString().slice(0,10)+'.csv';
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('报告已导出','success');
+            }catch(e){
+                showToast('导出失败: '+e.message,'error');
+            }
+        }
+
 
         // === 极简模式 ===
         let simpleCurrentStep=1;
@@ -2747,6 +3152,302 @@ def api_simple_rollback() -> Tuple:
     except Exception as e:
         _add_log("error", f"恢复失败: {e}")
         return jsonify({"error": f"恢复失败: {e}"}), 500
+
+
+
+
+# ============================================================================
+# 专业模式 API
+# ============================================================================
+
+
+@app.route("/api/pro/scan", methods=["POST"])
+@require_api_token
+@require_csrf
+def api_pro_scan() -> Tuple:
+    """专业模式 - 扫描目录"""
+    data = request.get_json(silent=True) or {}
+    source_dir = str(data.get("source_dir", ".")).strip()
+    output_dir = str(data.get("output_dir", source_dir)).strip()
+    
+    if not source_dir:
+        return jsonify({"error": "源目录不能为空"}), 400
+    if not _validate_path(source_dir, allow_absolute=True):
+        return jsonify({"error": "源目录路径不安全"}), 403
+    if not os.path.isdir(source_dir):
+        return jsonify({"error": "源目录不存在"}), 404
+    
+    try:
+        from nfo_to_vsmeta_converter_complete import Config
+        
+        config = Config()
+        video_extensions = getattr(config, "video_extensions", [".mp4", ".mkv", ".avi", ".ts", ".wmv", ".rmvb", ".mov", ".m4v"])
+        nfo_extensions = getattr(config, "nfo_extensions", [".nfo"])
+        vsmeta_extension = getattr(config, "vsmeta_extension", ".vsmeta")
+        
+        files = []
+        for root, dirs, filenames in os.walk(source_dir):
+            for filename in filenames:
+                ext = os.path.splitext(filename)[1].lower()
+                if ext in video_extensions:
+                    filepath = os.path.join(root, filename)
+                    base_name = os.path.splitext(filename)[0]
+                    
+                    # 检查NFO
+                    has_nfo = any(os.path.exists(os.path.join(root, base_name + nfo_ext)) for nfo_ext in nfo_extensions)
+                    
+                    # 检查VSMETA（在输出目录）
+                    out_dir = output_dir if os.path.exists(output_dir) else root
+                    has_vsmeta = os.path.exists(os.path.join(out_dir, base_name + vsmeta_extension))
+                    
+                    # 检查海报和背景图
+                    poster_exts = [".jpg", ".jpeg", ".png", ".gif", ".webp"]
+                    poster_names = [base_name + "-poster", base_name, "poster", "folder"]
+                    has_poster = any(os.path.exists(os.path.join(root, name + ext)) for name in poster_names for ext in poster_exts)
+                    
+                    backdrop_names = [base_name + "-fanart", base_name + "-backdrop", "fanart", "backdrop"]
+                    has_backdrop = any(os.path.exists(os.path.join(root, name + ext)) for name in backdrop_names for ext in poster_exts)
+                    
+                    # 确定状态
+                    if has_nfo and has_vsmeta:
+                        status = "success"
+                    elif not has_nfo:
+                        status = "error"
+                    else:
+                        status = "warning"
+                    
+                    files.append({
+                        "name": filename,
+                        "path": filepath,
+                        "directory": root,
+                        "status": status,
+                        "has_nfo": has_nfo,
+                        "has_vsmeta": has_vsmeta,
+                        "has_poster": has_poster,
+                        "has_backdrop": has_backdrop,
+                    })
+        
+        files.sort(key=lambda x: x["name"])
+        _add_log("info", f"扫描完成，找到 {len(files)} 个视频文件")
+        return jsonify({"files": files})
+    except Exception as e:
+        _add_log("error", f"扫描失败: {e}")
+        return jsonify({"error": f"扫描失败: {e}"}), 500
+
+
+@app.route("/api/pro/file-detail", methods=["POST"])
+@require_api_token
+@require_csrf
+def api_pro_file_detail() -> Tuple:
+    """专业模式 - 获取文件详情和对比"""
+    data = request.get_json(silent=True) or {}
+    filepath = str(data.get("filepath", "")).strip()
+    
+    if not filepath or not os.path.isfile(filepath):
+        return jsonify({"error": "文件不存在"}), 404
+    if not _validate_path(filepath, allow_absolute=True):
+        return jsonify({"error": "路径不安全"}), 403
+    
+    try:
+        from nfo_to_vsmeta_converter_complete import Config, NFOParser
+        
+        directory = os.path.dirname(filepath)
+        filename = os.path.basename(filepath)
+        base_name = os.path.splitext(filename)[0]
+        
+        config = Config()
+        nfo_extensions = getattr(config, "nfo_extensions", [".nfo"])
+        vsmeta_extension = getattr(config, "vsmeta_extension", ".vsmeta")
+        
+        # 检查NFO
+        nfo_path = None
+        has_nfo = False
+        for nfo_ext in nfo_extensions:
+            candidate = os.path.join(directory, base_name + nfo_ext)
+            if os.path.exists(candidate):
+                nfo_path = candidate
+                has_nfo = True
+                break
+        
+        # 检查VSMETA
+        has_vsmeta = os.path.exists(filepath + vsmeta_extension)
+        
+        # 检查海报和背景图
+        poster_exts = [".jpg", ".jpeg", ".png", ".gif", ".webp"]
+        poster_names = [base_name + "-poster", base_name, "poster", "folder"]
+        has_poster = any(os.path.exists(os.path.join(directory, name + ext)) for name in poster_names for ext in poster_exts)
+        
+        backdrop_names = [base_name + "-fanart", base_name + "-backdrop", "fanart", "backdrop"]
+        has_backdrop = any(os.path.exists(os.path.join(directory, name + ext)) for name in backdrop_names for ext in poster_exts)
+        
+        result = {
+            "filepath": filepath,
+            "filename": filename,
+            "directory": directory,
+            "has_nfo": has_nfo,
+            "has_vsmeta": has_vsmeta,
+            "has_poster": has_poster,
+            "has_backdrop": has_backdrop,
+            "nfo_metadata": None,
+            "vsmeta_metadata": None,
+        }
+        
+        # 解析NFO
+        if has_nfo and nfo_path:
+            try:
+                parser = NFOParser(config)
+                metadata = parser.parse(nfo_path)
+                if metadata:
+                    result["nfo_metadata"] = {
+                        "title": metadata.title,
+                        "year": metadata.year,
+                        "rating": metadata.rating,
+                        "plot": metadata.plot,
+                        "genres": metadata.genres,
+                        "directors": metadata.directors,
+                        "actors": metadata.actors,
+                    }
+            except Exception as e:
+                logger.warning(f"解析NFO失败: {e}")
+        
+        # 读取VSMETA
+        if has_vsmeta:
+            try:
+                vsmeta_path = filepath + vsmeta_extension
+                with open(vsmeta_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    vsmeta_content = f.read()
+                
+                # 简单解析VSMETA
+                import re
+                result["vsmeta_metadata"] = {
+                    "title": re.search(r'Title[=<>"\s]+([^<>"\n]+)', vsmeta_content) or re.search(r'title[=<>"\s]+([^<>"\n]+)', vsmeta_content, re.I),
+                    "year": re.search(r'Year[=<>"\s]+(\d{4})', vsmeta_content) or re.search(r'year[=<>"\s]+(\d{4})', vsmeta_content, re.I),
+                    "rating": re.search(r'Rating[=<>"\s]+([\d.]+)', vsmeta_content),
+                    "plot": re.search(r'Plot[=<>"\s]+([^<>"\n]+)', vsmeta_content, re.I) or re.search(r'plot[=<>"\s]+([^<>"\n]+)', vsmeta_content, re.I),
+                }
+            except Exception as e:
+                logger.warning(f"读取VSMETA失败: {e}")
+        
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"获取详情失败: {e}")
+        return jsonify({"error": f"获取详情失败: {e}"}), 500
+
+
+@app.route("/api/pro/start", methods=["POST"])
+@require_api_token
+@require_csrf
+def api_pro_start() -> Tuple:
+    """专业模式 - 开始转换"""
+    data = request.get_json(silent=True) or {}
+    source_dir = str(data.get("source_dir", ".")).strip()
+    output_dir = str(data.get("output_dir", source_dir)).strip()
+    media_type = str(data.get("media_type", "movie")).strip()
+    conflict_mode = str(data.get("conflict_mode", "skip")).strip()
+    
+    if not source_dir:
+        return jsonify({"error": "源目录不能为空"}), 400
+    if not _validate_path(source_dir, allow_absolute=True):
+        return jsonify({"error": "源目录路径不安全"}), 403
+    
+    try:
+        from nfo_to_vsmeta_converter_complete import Config, NFOToVSMETAConverter
+        
+        config = Config(
+            directory=source_dir,
+            overwrite_existing=conflict_mode == "overwrite",
+            enable_backup=conflict_mode == "backup",
+            safe_write_mode=True,
+        )
+        
+        converter = NFOToVSMETAConverter(config)
+        _set_state("converter", converter)
+        _set_state("config", config)
+        
+        _add_log("info", f"专业模式启动: {source_dir}")
+        
+        def run_conversion():
+            try:
+                converter.convert_all()
+            except Exception as e:
+                _add_log("error", f"转换失败: {e}")
+            finally:
+                _set_state("converter", None)
+        
+        thread = threading.Thread(target=run_conversion, daemon=True)
+        thread.start()
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        _add_log("error", f"启动失败: {e}")
+        return jsonify({"error": f"启动失败: {e}"}), 500
+
+
+@app.route("/api/pro/stop", methods=["POST"])
+@require_api_token
+@require_csrf
+def api_pro_stop() -> Tuple:
+    """专业模式 - 停止转换"""
+    try:
+        converter = _get_state("converter")
+        if converter and hasattr(converter, 'stop'):
+            converter.stop()
+        _set_state("converter", None)
+        _add_log("info", "转换任务已停止")
+        return jsonify({"success": True})
+    except Exception as e:
+        _add_log("error", f"停止失败: {e}")
+        return jsonify({"error": f"停止失败: {e}"}), 500
+
+
+@app.route("/api/pro/report", methods=["POST"])
+@require_api_token
+@require_csrf
+def api_pro_report() -> Tuple:
+    """专业模式 - 导出CSV报告"""
+    try:
+        from nfo_to_vsmeta_converter_complete import Config
+        
+        config = Config()
+        source_dir = getattr(config, "directory", ".")
+        video_extensions = getattr(config, "video_extensions", [".mp4", ".mkv", ".avi", ".ts", ".wmv", ".rmvb", ".mov", ".m4v"])
+        nfo_extensions = getattr(config, "nfo_extensions", [".nfo"])
+        vsmeta_extension = getattr(config, "vsmeta_extension", ".vsmeta")
+        
+        # 生成CSV
+        csv = "文件名,目录,NFO,VSMETA,海报,背景图,状态\n"
+        
+        for root, dirs, filenames in os.walk(source_dir):
+            for filename in filenames:
+                ext = os.path.splitext(filename)[1].lower()
+                if ext in video_extensions:
+                    filepath = os.path.join(root, filename)
+                    base_name = os.path.splitext(filename)[0]
+                    
+                    has_nfo = any(os.path.exists(os.path.join(root, base_name + nfo_ext)) for nfo_ext in nfo_extensions)
+                    has_vsmeta = os.path.exists(filepath + vsmeta_extension)
+                    
+                    poster_exts = [".jpg", ".jpeg", ".png", ".gif", ".webp"]
+                    poster_names = [base_name + "-poster", base_name, "poster", "folder"]
+                    has_poster = any(os.path.exists(os.path.join(root, name + ext)) for name in poster_names for ext in poster_exts)
+                    
+                    backdrop_names = [base_name + "-fanart", base_name + "-backdrop", "fanart", "backdrop"]
+                    has_backdrop = any(os.path.exists(os.path.join(root, name + ext)) for name in backdrop_names for ext in poster_exts)
+                    
+                    if has_nfo and has_vsmeta:
+                        status = "成功"
+                    elif not has_nfo:
+                        status = "失败-无NFO"
+                    else:
+                        status = "警告-无VSMETA"
+                    
+                    csv += f'"{filename}","{root}",{"有" if has_nfo else "无"},{"有" if has_vsmeta else "无"},{"有" if has_poster else "无"},{"有" if has_backdrop else "无"},"{status}"\n'
+        
+        return jsonify({"csv": csv})
+    except Exception as e:
+        _add_log("error", f"生成报告失败: {e}")
+        return jsonify({"error": f"生成报告失败: {e}"}), 500
+
 
 
 # ============================================================================
