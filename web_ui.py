@@ -505,6 +505,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
         <div class="main">
             <div class="tabs">
                 <button class="tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 仪表盘</button>
+                <button class="tab" data-tab="simple" onclick="switchTab('simple')">✨ 极简模式</button>
                 <button class="tab" data-tab="config" onclick="switchTab('config')">⚙️ 配置</button>
                 <button class="tab" data-tab="smart" onclick="switchTab('smart')">🤖 智能助手</button>
                 <button class="tab" data-tab="convert" onclick="switchTab('convert')">🚀 转换</button>
