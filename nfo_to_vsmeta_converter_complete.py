@@ -228,6 +228,133 @@ except ImportError:
 
 
 # ============================================================================
+# 安全工具函数
+# ============================================================================
+
+
+import re as _re
+
+
+def sanitize_filename(filename: str, replacement: str = "_") -> str:
+    """
+    清洗文件名中的非法字符
+    
+    Args:
+        filename: 原始文件名
+        replacement: 替换字符
+        
+    Returns:
+        清洗后的安全文件名
+    """
+    illegal_chars = r'[<>:"/\\|?*\x00-\x1f]'
+    result = _re.sub(illegal_chars, replacement, filename)
+    result = result.strip().strip(".")
+    if len(result) > 200:
+        name, ext = _re.split(r'(\.[^.]+)$', result, maxsplit=1)
+        result = name[:200-len(ext)] + ext
+    return result or "unnamed"
+
+
+def safe_write_file(filepath: str, data: bytes, create_backup: bool = False) -> bool:
+    """
+    安全写入文件（事务性写入：write-temp-rename）
+    
+    Args:
+        filepath: 目标文件路径
+        data: 要写入的数据
+        create_backup: 是否创建备份
+        
+    Returns:
+        是否成功
+    """
+    import tempfile
+    import os as _os
+    
+    try:
+        directory = _os.path.dirname(filepath)
+        filename = _os.path.basename(filepath)
+        
+        fd, temp_path = tempfile.mkstemp(dir=directory or ".", prefix=".tmp_", suffix=".vsmeta")
+        try:
+            with _os.fdopen(fd, "wb") as f:
+                f.write(data)
+            
+            if create_backup and _os.path.exists(filepath):
+                backup_path = filepath + ".bak"
+                try:
+                    _os.rename(filepath, backup_path)
+                except Exception:
+                    logger.warning(f"备份文件失败: {filepath}")
+            
+            _os.replace(temp_path, filepath)
+            return True
+            
+        except Exception as e:
+            try:
+                if _os.path.exists(temp_path):
+                    _os.remove(temp_path)
+            except Exception:
+                pass
+            raise e
+            
+    except Exception as e:
+        logger.error(f"安全写入失败 {filepath}: {e}")
+        return False
+
+
+def detect_and_fix_encoding(file_path: str, fallback_encodings: list = None) -> str:
+    """
+    自动检测并修复文件编码
+    
+    Args:
+        file_path: 文件路径
+        fallback_encodings: 备用编码列表
+        
+    Returns:
+        正确编码的文件内容
+    """
+    if fallback_encodings is None:
+        fallback_encodings = ["utf-8", "gbk", "gb2312", "latin-1"]
+    
+    for encoding in fallback_encodings:
+        try:
+            with open(file_path, "r", encoding=encoding) as f:
+                content = f.read()
+            logger.debug(f"使用编码 {encoding} 读取文件成功: {file_path}")
+            return content
+        except UnicodeDecodeError:
+            continue
+        except Exception as e:
+            logger.warning(f"使用编码 {encoding} 读取失败: {e}")
+            continue
+    
+    logger.error(f"无法使用任何编码读取文件: {file_path}")
+    return ""
+
+
+def smart_read_file(filepath: str, binary: bool = False) -> Union[str, bytes]:
+    """
+    智能读取文件，自动处理编码问题
+    
+    Args:
+        filepath: 文件路径
+        binary: 是否以二进制模式读取
+        
+    Returns:
+        文件内容
+    """
+    if binary:
+        try:
+            with open(filepath, "rb") as f:
+                return f.read()
+        except Exception as e:
+            logger.error(f"读取二进制文件失败 {filepath}: {e}")
+            return b""
+    else:
+        return detect_and_fix_encoding(filepath)
+
+
+# ============================================================================
 # 日志配置
 # ============================================================================
 
@@ -401,6 +528,11 @@ class Config:
     enable_chinese_conversion: bool = False  # 是否启用中文简繁转换
     chinese_conversion_target: str = "zh-cn"  # 目标语言：zh-cn(简体), zh-tw(繁体), zh-hk(繁体香港), etc.
 
+    # === 安全与可靠性配置 ===
+    safe_write_mode: bool = True  # 事务性写入（write-temp-rename）
+    sanitize_filename: bool = False  # 清洗文件名中的非法字符
+    fix_encoding: bool = True  # 自动修复编码问题
+
     def __post_init__(self):
         """
         初始化后处理
@@ -562,8 +694,13 @@ def _process_file_worker(args: Tuple) -> Dict:
 
     # 写入文件
     try:
-        with open(vsmeta_path, "wb") as f:
-            f.write(vsmeta_data)
+        if getattr(config, 'safe_write_mode', True):
+            success = safe_write_file(vsmeta_path, vsmeta_data, create_backup=config.enable_backup)
+            if not success:
+                return {"success": False, "result": "write_error", "error": "VSMETA 写入失败"}
+        else:
+            with open(vsmeta_path, "wb") as f:
+                f.write(vsmeta_data)
     except Exception as e:
         return {"success": False, "result": "write_error", "error": f"写入失败: {e}"}
 
@@ -646,27 +783,11 @@ class NFOParser:
             VideoMetadata 对象，解析失败返回 None
         """
         try:
-            # === 先读取文件内容，检测编码 ===
-            with open(nfo_path, "rb") as f:
-                raw_data = f.read()
-
-            # === 检测编码 ===
-            try:
-                # 尝试 UTF-8（优先处理 BOM）
-                if raw_data.startswith(b"\xef\xbb\xbf"):  # UTF-8 BOM
-                    content = raw_data[3:].decode("utf-8")
-                else:
-                    try:
-                        content = raw_data.decode("utf-8")
-                    except UnicodeDecodeError:
-                        # 尝试 GBK/GB2312（常见于中文 NFO）
-                        try:
-                            content = raw_data.decode("gbk")
-                        except UnicodeDecodeError:
-                            # 最后尝试 Latin-1（不会失败）
-                            content = raw_data.decode("latin-1")
-            except Exception as e:
-                logger.error(f"读取 NFO 文件失败 {nfo_path}: {e}")
+            # === 智能编码检测和修复 ===
+            # 使用 smart_read_file 自动处理 GBK/UTF-8 编码混乱问题
+            content = smart_read_file(nfo_path, binary=False)
+            if not content:
+                logger.error(f"无法读取 NFO 文件内容: {nfo_path}")
                 return None
 
             # === 从字符串解析 XML ===
@@ -3218,8 +3339,16 @@ class NFOToVSMETAConverter:
 
         # === 写入文件 ===
         try:
-            with open(vsmeta_path, "wb") as f:
-                f.write(vsmeta_data)
+            # 根据配置决定写入模式
+            if getattr(self.config, 'safe_write_mode', True):
+                # 使用事务性写入，防止断电导致文件损坏
+                success = safe_write_file(vsmeta_path, vsmeta_data, create_backup=self.config.enable_backup)
+                if not success:
+                    return {"success": False, "result": "write_error", "error": "VSMETA 写入失败"}
+            else:
+                # 使用传统直接写入
+                with open(vsmeta_path, "wb") as f:
+                    f.write(vsmeta_data)
         except Exception as e:
             return {"success": False, "result": "write_error", "error": f"写入失败: {e}"}
 

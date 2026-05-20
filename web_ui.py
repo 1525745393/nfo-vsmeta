@@ -650,6 +650,13 @@ INDEX_HTML = r"""<!DOCTYPE html>
                 </div>
 
                 <div class="card">
+                    <div class="card-header"><h2>🛡️ 安全与可靠性</h2></div>
+                    <div class="form-group"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="cfgSafeWrite" checked> 事务性写入</label><div class="help-text">使用 write-temp-rename 机制，防止断电导致文件损坏</div></div>
+                    <div class="form-group"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="cfgSanitizeFilename"> 清洗文件名</label><div class="help-text">自动过滤文件名中的非法字符</div></div>
+                    <div class="form-group"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="cfgFixEncoding" checked> 编码自动修复</label><div class="help-text">自动处理 GBK/UTF-8 编码混乱问题</div></div>
+                </div>
+
+                <div class="card">
                     <div class="card-header"><h2>插件配置</h2></div>
                     <div class="form-group"><label>插件目录</label><input type="text" class="form-control" id="cfgPluginDir" value="plugins" placeholder="plugins/"></div>
                 </div>
@@ -865,7 +872,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
         // === 配置 ===
         const CFG_FIELDS={cfgDirectory:'directory',cfgWorkers:'max_workers',cfgMode:'process_mode',cfgMaxImgSize:'max_image_size_kb',cfgCompression:'image_compression_ratio',cfgRetries:'retry_attempts',cfgRetryDelay:'retry_delay',cfgInclude:'file_include_patterns',cfgExclude:'file_exclude_patterns',cfgRegex:'file_regex',cfgFormats:'output_formats',cfgMinSize:'min_size',cfgMaxSize:'max_size',cfgNfoExt:'nfo_extensions',cfgVideoExt:'video_extensions',cfgVsmetaExt:'vsmeta_extension',cfgBackupDir:'backup_dir',cfgCheckpointFile:'checkpoint_file',cfgReportDir:'report_output_dir',cfgImgCacheSize:'image_cache_max_size',cfgCheckpointInterval:'checkpoint_save_interval',cfgLogLevel:'log_level',cfgLogFile:'log_file',cfgLogFileMaxSize:'log_file_max_size',cfgLogFileBackupCount:'log_file_backup_count',cfgBackupMaxCount:'backup_max_count',cfgBackupMaxAge:'backup_max_age_days',cfgPluginDir:'plugin_dir',cfgAiKey:'ai_api_key',cfgAiUrl:'ai_api_url',cfgChineseTarget:'chinese_conversion_target'};
         const LIST_FIELDS=new Set(['file_include_patterns','file_exclude_patterns','output_formats','nfo_extensions','video_extensions']);
-        const BOOL_FIELDS={cfgOverwrite:'overwrite_existing',cfgBackup:'enable_backup',cfgDeleteVsmeta:'delete_existing_vsmeta',cfgDryRun:'dry_run',cfgTvShow:'tv_show_mode',cfgAutoLoadPlugins:'auto_load_plugins',cfgAiEnable:'enable_ai_completion',cfgChineseConvert:'enable_chinese_conversion'};
+        const BOOL_FIELDS={cfgOverwrite:'overwrite_existing',cfgBackup:'enable_backup',cfgDeleteVsmeta:'delete_existing_vsmeta',cfgDryRun:'dry_run',cfgTvShow:'tv_show_mode',cfgAutoLoadPlugins:'auto_load_plugins',cfgAiEnable:'enable_ai_completion',cfgChineseConvert:'enable_chinese_conversion',cfgSafeWrite:'safe_write_mode',cfgSanitizeFilename:'sanitize_filename',cfgFixEncoding:'fix_encoding'};
         const NUM_FIELDS=new Set(['max_workers','max_image_size_kb','retry_attempts','retry_delay','image_compression_ratio','min_size','max_size','log_file_max_size','log_file_backup_count','backup_max_count','backup_max_age_days','image_cache_max_size','checkpoint_save_interval']);
 
         async function loadConfig(){try{const data=await api('/api/config');const c=data.config||{};for(const[elId,field]of Object.entries(CFG_FIELDS)){const el=document.getElementById(elId);if(!el)continue;const v=c[field];if(v===undefined||v===null)continue;if(LIST_FIELDS.has(field)){el.value=Array.isArray(v)?v.join(', '):''}else{el.value=v}}for(const[elId,field]of Object.entries(BOOL_FIELDS)){const el=document.getElementById(elId);if(el)el.checked=!!c[field]}showToast('配置已加载','info')}catch(e){showToast('加载失败: '+e.message,'error')}}
