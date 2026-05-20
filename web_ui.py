@@ -811,6 +811,183 @@ INDEX_HTML = r"""<!DOCTYPE html>
                     <button class="btn btn-primary" onclick="createPluginTemplate()">✨ 创建插件</button>
                 </div>
             </div>
+
+            <!-- ========== 极简模式 ========== -->
+            <div class="page" id="page-simple">
+                <style>
+                    .simple-container{max-width:900px;margin:0 auto;padding:40px 20px}
+                    .simple-step{display:none;animation:fadeIn .3s ease}
+                    .simple-step.active{display:block}
+                    .step-indicator{display:flex;justify-content:center;gap:12px;margin-bottom:40px}
+                    .step-item{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--bg-input);border:1px solid var(--border);border-radius:12px;opacity:.5;transition:all .3s}
+                    .step-item.active{opacity:1;border-color:var(--accent);background:rgba(59,130,246,.08)}
+                    .step-item.completed{opacity:.9;border-color:var(--success);background:rgba(34,197,94,.08)}
+                    .step-number{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--border);color:var(--text-muted);font-weight:600;font-size:13px}
+                    .step-item.active .step-number{background:var(--accent);color:#fff}
+                    .step-item.completed .step-number{background:var(--success);color:#fff}
+                    .step-label{font-size:13px;font-weight:500;color:var(--text-secondary)}
+                    .simple-card{background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:40px;text-align:center;margin-bottom:24px}
+                    .simple-card h2{font-size:22px;margin-bottom:8px}
+                    .simple-card p{color:var(--text-secondary);margin-bottom:24px;line-height:1.6}
+                    .folder-selector{background:var(--bg-input);border:2px dashed var(--border);border-radius:16px;padding:40px;cursor:pointer;transition:all .2s;margin-bottom:20px}
+                    .folder-selector:hover{border-color:var(--accent);background:rgba(59,130,246,.05)}
+                    .folder-icon{font-size:56px;margin-bottom:16px}
+                    .folder-path{margin-top:16px;padding:16px;background:var(--bg-input);border-radius:12px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-secondary);word-break:break-all;display:none}
+                    .folder-path.visible{display:block}
+                    .option-group{background:var(--bg-input);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;text-align:left}
+                    .option-group h3{font-size:14px;margin-bottom:12px;color:var(--text-primary)}
+                    .option-item{display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg-card);border-radius:8px;margin-bottom:8px;cursor:pointer;border:2px solid transparent;transition:all .2s}
+                    .option-item.selected{border-color:var(--accent);background:rgba(59,130,246,.08)}
+                    .option-item:last-child{margin-bottom:0}
+                    .option-dot{width:20px;height:20px;border:2px solid var(--border);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+                    .option-item.selected .option-dot{border-color:var(--accent);background:var(--accent)}
+                    .option-item.selected .option-dot::after{content:'';width:8px;height:8px;background:#fff;border-radius:50%}
+                    .option-text{flex:1}
+                    .option-title{font-size:14px;font-weight:500;color:var(--text-primary);margin-bottom:2px}
+                    .option-desc{font-size:12px;color:var(--text-muted)}
+                    .preview-container{display:grid;grid-template-columns:1fr;gap:20px;margin-bottom:20px}
+                    .preview-item{background:var(--bg-input);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:left}
+                    .preview-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+                    .preview-title{font-size:15px;font-weight:600}
+                    .preview-status{font-size:12px;padding:4px 10px;border-radius:20px}
+                    .preview-status.has-nfo{background:rgba(34,197,94,.15);color:var(--success)}
+                    .preview-status.no-nfo{background:rgba(239,68,68,.15);color:var(--danger)}
+                    .preview-detail{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+                    .preview-badge{font-size:11px;padding:4px 10px;background:var(--bg-card);border-radius:8px;color:var(--text-secondary)}
+                    .preview-badge.has{color:var(--success);background:rgba(34,197,94,.1)}
+                    .preview-badge.missing{color:var(--danger);background:rgba(239,68,68,.1)}
+                    .compare-container{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+                    .compare-section{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:20px}
+                    .compare-title{font-size:14px;font-weight:600;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+                    .compare-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+                    .compare-item:last-child{border-bottom:none}
+                    .compare-label{font-size:13px;color:var(--text-secondary)}
+                    .compare-value{font-size:13px;color:var(--text-primary);font-family:'JetBrains Mono',monospace;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+                    .compare-value.added{color:var(--success)}
+                    .compare-value.removed{color:var(--danger);text-decoration:line-through}
+                    .compare-value.unchanged{color:var(--text-muted)}
+                    .slider-container{position:relative;width:100%;aspect-ratio:16/9;background:var(--bg-input);border-radius:12px;overflow:hidden;margin-bottom:20px}
+                    .slider-before,.slider-after{position:absolute;inset:0;background-size:cover;background-position:center}
+                    .slider-handle{position:absolute;top:0;bottom:0;width:4px;background:var(--accent);cursor:ew-resize;z-index:2}
+                    .slider-handle::before{content:'⇄';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--accent);color:#fff;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+                    .simple-btn-group{display:flex;gap:12px;justify-content:center;margin-top:30px}
+                    .simple-btn{padding:14px 32px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;border:none;transition:all .2s}
+                    .simple-btn-primary{background:var(--accent);color:#fff}
+                    .simple-btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px)}
+                    .simple-btn-secondary{background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border)}
+                    .simple-btn-secondary:hover{background:var(--bg-card)}
+                    .simple-btn:disabled{opacity:.5;cursor:not-allowed}
+                    .result-item{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+                    .result-left{display:flex;align-items:center;gap:12px;flex:1;min-width:0}
+                    .result-icon{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:rgba(59,130,246,.1);font-size:18px;flex-shrink:0}
+                    .result-info{flex:1;min-width:0}
+                    .result-name{font-size:14px;font-weight:500;color:var(--text-primary);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+                    .result-status{font-size:12px;color:var(--text-muted)}
+                    .result-right{display:flex;gap:8px;flex-shrink:0}
+                    .progress-circle{width:120px;height:120px;border-radius:50%;background:conic-gradient(var(--accent) var(--progress),var(--bg-input) 0);display:flex;align-items:center;justify-content:center;margin:20px auto}
+                    .progress-inner{width:90px;height:90px;border-radius:50%;background:var(--bg-card);display:flex;align-items:center;justify-content:center;flex-direction:column}
+                    .progress-percent{font-size:28px;font-weight:700;color:var(--accent)}
+                    .progress-label{font-size:12px;color:var(--text-muted);margin-top:4px}
+                </style>
+                <div class="simple-container">
+                    <div class="step-indicator">
+                        <div class="step-item active" id="step1-indicator">
+                            <div class="step-number">1</div>
+                            <div class="step-label">选你的电影文件夹</div>
+                        </div>
+                        <div class="step-item" id="step2-indicator">
+                            <div class="step-number">2</div>
+                            <div class="step-label">预览效果</div>
+                        </div>
+                        <div class="step-item" id="step3-indicator">
+                            <div class="step-number">3</div>
+                            <div class="step-label">开始转换</div>
+                        </div>
+                    </div>
+
+                    <!-- 步骤 1: 选文件夹 -->
+                    <div class="simple-step active" id="step1">
+                        <div class="simple-card">
+                            <div class="folder-icon">📂</div>
+                            <h2>选你的电影文件夹</h2>
+                            <p>找到你存放电影的文件夹，我们会自动扫描并找出所有需要处理的文件</p>
+                            <div class="folder-selector" onclick="simpleSelectFolder()">
+                                <div style="font-size:48px">📁</div>
+                                <div style="font-size:15px;color:var(--text-secondary);margin-top:12px">点击选择文件夹</div>
+                                <div style="font-size:12px;color:var(--text-muted);margin-top:4px">或者直接在下面粘贴路径</div>
+                            </div>
+                            <div class="form-group" style="text-align:left;margin-top:20px">
+                                <label style="display:block;text-align:left;margin-bottom:8px">文件夹路径</label>
+                                <input type="text" class="form-control" id="simpleFolderPath" placeholder="/path/to/your/movies" style="text-align:left">
+                            </div>
+                            <div class="option-group" style="text-align:left">
+                                <h3>已有数据怎么办？</h3>
+                                <div class="option-item selected" onclick="simpleSelectOption(this,'skip')" data-value="skip">
+                                    <div class="option-dot"></div>
+                                    <div class="option-text">
+                                        <div class="option-title">跳过已有的</div>
+                                        <div class="option-desc">只处理还没有转换过的文件</div>
+                                    </div>
+                                </div>
+                                <div class="option-item" onclick="simpleSelectOption(this,'overwrite')" data-value="overwrite">
+                                    <div class="option-dot"></div>
+                                    <div class="option-text">
+                                        <div class="option-title">全部重新转换</div>
+                                        <div class="option-desc">覆盖已有的数据（已为您备份）</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="simple-btn-group">
+                                <button class="simple-btn simple-btn-primary" onclick="simpleNextStep()">下一步 →</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 步骤 2: 预览效果 -->
+                    <div class="simple-step" id="step2">
+                        <div class="simple-card">
+                            <h2>🔍 检查一下</h2>
+                            <p>我们找到了这些文件，确认无误后继续</p>
+                            <div id="simplePreviewList" style="max-height:400px;overflow-y:auto;text-align:left">
+                                <div class="empty-state">
+                                    <div class="icon">⏳</div>
+                                    <p>正在扫描...</p>
+                                </div>
+                            </div>
+                            <div class="simple-btn-group">
+                                <button class="simple-btn simple-btn-secondary" onclick="simplePrevStep()">← 返回</button>
+                                <button class="simple-btn simple-btn-primary" onclick="simpleNextStep()">开始转换 →</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 步骤 3: 开始转换 -->
+                    <div class="simple-step" id="step3">
+                        <div class="simple-card">
+                            <h2>🚀 正在转换</h2>
+                            <p>别担心，我们已经为您备份好了原始数据</p>
+                            <div class="progress-circle" id="simpleProgressCircle" style="--progress:0%">
+                                <div class="progress-inner">
+                                    <div class="progress-percent" id="simpleProgressPercent">0%</div>
+                                    <div class="progress-label">已完成</div>
+                                </div>
+                            </div>
+                            <div id="simpleResultList" style="text-align:left;max-height:300px;overflow-y:auto;">
+                                <div class="empty-state">
+                                    <div class="icon">⏳</div>
+                                    <p>等待开始...</p>
+                                </div>
+                            </div>
+                            <div class="simple-btn-group" id="simpleStep3Buttons">
+                                <button class="simple-btn simple-btn-secondary" onclick="simplePrevStep()">← 返回</button>
+                            </div>
+                            <div class="simple-btn-group" id="simpleDoneButtons" style="display:none">
+                                <button class="simple-btn simple-btn-primary" onclick="simpleStartOver()">🔄 重新开始</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             
             <!-- ========== 可视化对比 ========== -->
             <div class="page" id="page-visual">
@@ -852,6 +1029,153 @@ INDEX_HTML = r"""<!DOCTYPE html>
         let csrfToken='';const SAFE_LEVELS=new Set(['info','warning','error','success','debug']);
 
         function switchTab(name){document.querySelectorAll('.tab').forEach(t=>{t.classList.toggle('active',t.dataset.tab===name)});document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));const page=document.getElementById('page-'+name);if(page)page.classList.add('active');if(name==='convert')refreshScanResults();if(name==='checkpoint')refreshCheckpoint();if(name==='backup')refreshBackups();if(name==='visual'){startVisualMonitor()}}
+
+        // === 极简模式 ===
+        let simpleCurrentStep=1;
+        let simpleScanData=null;
+        let simplePollTimer=null;
+
+        function simpleSelectFolder(){
+            const path=prompt('请输入文件夹路径:');
+            if(path){
+                document.getElementById('simpleFolderPath').value=path;
+            }
+        }
+
+        function simpleSelectOption(el,value){
+            el.parentElement.querySelectorAll('.option-item').forEach(item=>item.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        async function simpleNextStep(){
+            if(simpleCurrentStep===1){
+                const folderPath=document.getElementById('simpleFolderPath').value;
+                if(!folderPath){
+                    showToast('请选择文件夹','warning');
+                    return;
+                }
+                simpleCurrentStep=2;
+                simpleUpdateSteps();
+                await simpleScanFiles(folderPath);
+            }else if(simpleCurrentStep===2){
+                simpleCurrentStep=3;
+                simpleUpdateSteps();
+                await simpleStartConversion();
+            }
+        }
+
+        function simplePrevStep(){
+            if(simpleCurrentStep>1){
+                simpleCurrentStep--;
+                simpleUpdateSteps();
+                if(simplePollTimer){
+                    clearInterval(simplePollTimer);
+                    simplePollTimer=null;
+                }
+            }
+        }
+
+        function simpleUpdateSteps(){
+            for(let i=1;i<=3;i++){
+                const el=document.getElementById('step'+i+'-indicator');
+                el.classList.remove('active','completed');
+                if(i===simpleCurrentStep)el.classList.add('active');
+                else if(i<simpleCurrentStep)el.classList.add('completed');
+                document.getElementById('step'+i).classList.remove('active');
+            }
+            document.getElementById('step'+simpleCurrentStep).classList.add('active');
+        }
+
+        async function simpleScanFiles(folderPath){
+            try{
+                const data=await api('/api/simple/scan','POST',{directory:folderPath});
+                simpleScanData=data;
+                const container=document.getElementById('simplePreviewList');
+                if(data.files.length===0){
+                    container.innerHTML='<div class="empty-state"><div class="icon">📭</div><p>没有找到文件</p></div>';
+                    return;
+                }
+                container.innerHTML=data.files.map(f=>{
+                    const statusClass=f.has_nfo?'has-nfo':'no-nfo';
+                    const statusText=f.has_nfo?'有 NFO':'无 NFO';
+                    const badges=[];
+                    if(f.has_vsmeta)badges.push('<span class="preview-badge has">✓ VSMETA</span>');
+                    if(f.has_poster)badges.push('<span class="preview-badge has">✓ 海报</span>');
+                    if(f.has_backdrop)badges.push('<span class="preview-badge has">✓ 背景</span>');
+                    if(!f.has_vsmeta)badges.push('<span class="preview-badge missing">✗ VSMETA</span>');
+                    if(!f.has_poster)badges.push('<span class="preview-badge missing">✗ 海报</span>');
+                    if(!f.has_backdrop)badges.push('<span class="preview-badge missing">✗ 背景</span>');
+                    return '<div class="preview-item"><div class="preview-header"><div class="preview-title">'+escHtml(f.name)+'</div><span class="preview-status '+statusClass+'">'+statusText+'</span></div><div class="preview-detail">'+badges.join('')+'</div></div>';
+                }).join('');
+            }catch(e){
+                showToast('扫描失败: '+e.message,'error');
+                document.getElementById('simplePreviewList').innerHTML='<div class="empty-state"><div class="icon">❌</div><p>扫描失败</p></div>';
+            }
+        }
+
+        async function simpleStartConversion(){
+            try{
+                const folderPath=document.getElementById('simpleFolderPath').value;
+                const option=document.querySelector('.option-item.selected')?.dataset.value||'skip';
+                await api('/api/simple/start','POST',{directory:folderPath,option:option});
+                simplePollTimer=setInterval(simplePollStatus,500);
+            }catch(e){
+                showToast('启动失败: '+e.message,'error');
+            }
+        }
+
+        async function simplePollStatus(){
+            try{
+                const data=await api('/api/status');
+                const p=data.progress||{};
+                const total=p.total||1;
+                const percent=Math.round((p.completed/total)*100);
+                document.getElementById('simpleProgressCircle').style.setProperty('--progress',percent+'%');
+                document.getElementById('simpleProgressPercent').textContent=percent+'%';
+                
+                const container=document.getElementById('simpleResultList');
+                if(data.recent_files&&data.recent_files.length>0){
+                    container.innerHTML=data.recent_files.map(f=>{
+                        const icon=f.result==='success'?'✅':f.result==='error'?'❌':'⏭️';
+                        const rollbackBtn=f.result==='success'?'<button class="btn btn-sm btn-danger" onclick="simpleRollbackFile(\''+escHtml(f.dir+'/'+f.file)+'\')">恢复原样</button>':'';
+                        return '<div class="result-item"><div class="result-left"><div class="result-icon">'+icon+'</div><div class="result-info"><div class="result-name">'+escHtml(f.file)+'</div><div class="result-status">'+escHtml(f.result||'')+'</div></div></div><div class="result-right">'+rollbackBtn+'</div></div>';
+                    }).join('');
+                }
+                
+                if(!data.is_running&&p.completed>0){
+                    clearInterval(simplePollTimer);
+                    simplePollTimer=null;
+                    document.getElementById('simpleStep3Buttons').style.display='none';
+                    document.getElementById('simpleDoneButtons').style.display='flex';
+                    showToast('转换完成！','success');
+                }
+            }catch(e){
+                console.error(e);
+            }
+        }
+
+        async function simpleRollbackFile(filepath){
+            try{
+                showConfirm('恢复原样','确定要恢复这个文件吗？这将删除转换后的 VSMETA',async()=>{
+                    await api('/api/simple/rollback','POST',{filepath:filepath});
+                    showToast('已恢复！','success');
+                    simplePollStatus();
+                });
+            }catch(e){
+                showToast('恢复失败: '+e.message,'error');
+            }
+        }
+
+        function simpleStartOver(){
+            simpleCurrentStep=1;
+            simpleUpdateSteps();
+            document.getElementById('simplePreviewList').innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>正在扫描...</p></div>';
+            document.getElementById('simpleResultList').innerHTML='<div class="empty-state"><div class="icon">⏳</div><p>等待开始...</p></div>';
+            document.getElementById('simpleProgressCircle').style.setProperty('--progress','0%');
+            document.getElementById('simpleProgressPercent').textContent='0%';
+            document.getElementById('simpleStep3Buttons').style.display='flex';
+            document.getElementById('simpleDoneButtons').style.display='none';
+        }
 
         function showToast(message,type='info'){const c=document.getElementById('toastContainer');const icons={success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'};const t=document.createElement('div');t.className='toast toast-'+type;t.innerHTML='<span class="toast-icon">'+(icons[type]||'ℹ️')+'</span><span>'+escHtml(message)+'</span>';c.appendChild(t);setTimeout(()=>{if(t.parentNode)t.parentNode.removeChild(t)},3000)}
 
@@ -2277,6 +2601,151 @@ def api_visual_rollback() -> Tuple:
     except Exception as e:
         _add_log("error", f"回滚失败: {e}")
         return jsonify({"error": f"回滚失败: {e}"}), 500
+
+
+# ============================================================================
+# 极简模式 API
+# ============================================================================
+
+
+@app.route("/api/simple/scan", methods=["POST"])
+@require_api_token
+@require_csrf
+def api_simple_scan() -> Tuple:
+    """极简模式 - 扫描目录"""
+    data = request.get_json(silent=True) or {}
+    directory = str(data.get("directory", ".")).strip()
+    if not directory:
+        return jsonify({"error": "目录不能为空"}), 400
+    if not _validate_path(directory, allow_absolute=True):
+        return jsonify({"error": "路径不安全"}), 403
+    if not os.path.isdir(directory):
+        return jsonify({"error": "目录不存在"}), 404
+    
+    try:
+        from nfo_to_vsmeta_converter_complete import Config
+        
+        config = Config()
+        video_extensions = getattr(config, "video_extensions", [".mp4", ".mkv", ".avi", ".ts", ".wmv", ".rmvb", ".mov", ".m4v"])
+        nfo_extensions = getattr(config, "nfo_extensions", [".nfo"])
+        vsmeta_extension = getattr(config, "vsmeta_extension", ".vsmeta")
+        
+        files = []
+        for root, dirs, filenames in os.walk(directory):
+            for filename in filenames:
+                ext = os.path.splitext(filename)[1].lower()
+                if ext in video_extensions:
+                    filepath = os.path.join(root, filename)
+                    base_name = os.path.splitext(filename)[0]
+                    
+                    # 检查NFO
+                    has_nfo = any(os.path.exists(os.path.join(root, base_name + nfo_ext)) for nfo_ext in nfo_extensions)
+                    
+                    # 检查VSMETA
+                    has_vsmeta = os.path.exists(filepath + vsmeta_extension)
+                    
+                    # 检查海报和背景图
+                    poster_exts = [".jpg", ".jpeg", ".png", ".gif", ".webp"]
+                    poster_names = [base_name + "-poster", base_name, "poster", "folder"]
+                    has_poster = any(os.path.exists(os.path.join(root, name + ext)) for name in poster_names for ext in poster_exts)
+                    
+                    backdrop_names = [base_name + "-fanart", base_name + "-backdrop", "fanart", "backdrop"]
+                    has_backdrop = any(os.path.exists(os.path.join(root, name + ext)) for name in backdrop_names for ext in poster_exts)
+                    
+                    files.append({
+                        "name": filename,
+                        "path": filepath,
+                        "directory": root,
+                        "has_nfo": has_nfo,
+                        "has_vsmeta": has_vsmeta,
+                        "has_poster": has_poster,
+                        "has_backdrop": has_backdrop,
+                    })
+        
+        files.sort(key=lambda x: x["name"])
+        _add_log("info", f"扫描完成，找到 {len(files)} 个视频文件")
+        return jsonify({"files": files})
+    except Exception as e:
+        _add_log("error", f"扫描失败: {e}")
+        return jsonify({"error": f"扫描失败: {e}"}), 500
+
+
+@app.route("/api/simple/start", methods=["POST"])
+@require_api_token
+@require_csrf
+def api_simple_start() -> Tuple:
+    """极简模式 - 开始转换"""
+    data = request.get_json(silent=True) or {}
+    directory = str(data.get("directory", ".")).strip()
+    option = str(data.get("option", "skip")).strip()
+    if not directory:
+        return jsonify({"error": "目录不能为空"}), 400
+    if not _validate_path(directory, allow_absolute=True):
+        return jsonify({"error": "路径不安全"}), 403
+    if not os.path.isdir(directory):
+        return jsonify({"error": "目录不存在"}), 404
+    
+    try:
+        from nfo_to_vsmeta_converter_complete import Config, NFOToVSMETAConverter
+        
+        config = Config(
+            directory=directory,
+            overwrite_existing=option == "overwrite",
+            enable_backup=True,
+            safe_write_mode=True,
+        )
+        
+        converter = NFOToVSMETAConverter(config)
+        _set_state("converter", converter)
+        _set_state("config", config)
+        
+        _add_log("info", f"极简模式启动: {directory}")
+        
+        def run_conversion():
+            try:
+                converter.convert_all()
+            except Exception as e:
+                _add_log("error", f"转换失败: {e}")
+            finally:
+                _set_state("converter", None)
+        
+        thread = threading.Thread(target=run_conversion, daemon=True)
+        thread.start()
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        _add_log("error", f"启动失败: {e}")
+        return jsonify({"error": f"启动失败: {e}"}), 500
+
+
+@app.route("/api/simple/rollback", methods=["POST"])
+@require_api_token
+@require_csrf
+def api_simple_rollback() -> Tuple:
+    """极简模式 - 回滚文件"""
+    data = request.get_json(silent=True) or {}
+    filepath = str(data.get("filepath", "")).strip()
+    if not filepath or not os.path.isfile(filepath):
+        return jsonify({"error": "文件不存在"}), 404
+    if not _validate_path(filepath, allow_absolute=True):
+        return jsonify({"error": "路径不安全"}), 403
+    
+    try:
+        from nfo_to_vsmeta_converter_complete import Config
+        
+        config = Config()
+        vsmeta_extension = getattr(config, "vsmeta_extension", ".vsmeta")
+        vsmeta_path = filepath + vsmeta_extension
+        
+        if os.path.exists(vsmeta_path):
+            os.remove(vsmeta_path)
+            _add_log("success", f"已恢复原样: {os.path.basename(filepath)}")
+            return jsonify({"success": True, "message": "已恢复"})
+        else:
+            return jsonify({"success": True, "message": "VSMETA文件不存在"})
+    except Exception as e:
+        _add_log("error", f"恢复失败: {e}")
+        return jsonify({"error": f"恢复失败: {e}"}), 500
 
 
 # ============================================================================
