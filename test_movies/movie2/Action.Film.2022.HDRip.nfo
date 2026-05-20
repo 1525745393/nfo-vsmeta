@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<movie>
+  <title>动作电影测试</title>
+  <originaltitle>Action Film Test</originaltitle>
+  <year>2022</year>
+  <rating>7.2</rating>
+  <plot>一部紧张刺激的动作片，充满爆炸和追逐场面。</plot>
+  <genre>动作</genre>
+  <genre>冒险</genre>
+  <director>动作导演</director>
+  <actor>动作明星A</actor>
+  <actor>动作明星B</actor>
+</movie>

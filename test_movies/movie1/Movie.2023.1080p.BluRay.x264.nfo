@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<movie>
+  <title>电影测试1</title>
+  <originaltitle>Test Movie 1</originaltitle>
+  <year>2023</year>
+  <rating>8.5</rating>
+  <plot>这是一部精彩的测试电影。讲述了关于测试和数据的故事。</plot>
+  <genre>剧情</genre>
+  <genre>悬疑</genre>
+  <director>测试导演</director>
+  <actor>演员A</actor>
+  <actor>演员B</actor>
+</movie>
