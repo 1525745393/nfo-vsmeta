@@ -276,6 +276,30 @@ INDEX_HTML = '''
             margin-bottom: 1rem;
             color: var(--success);
         }
+        
+        .image-container {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+            text-align: center;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .image-container img {
+            max-width: 100%;
+            max-height: 500px;
+            border-radius: 4px;
+            object-fit: contain;
+        }
+        
+        .image-placeholder {
+            color: var(--text2);
+            font-size: 1.1rem;
+        }
     </style>
 </head>
 <body>
@@ -348,6 +372,8 @@ INDEX_HTML = '''
                         <button class="detail-tab" onclick="showDetail('nfo')">📄 NFO</button>
                         <button class="detail-tab" onclick="showDetail('vsmeta')">📝 VSMETA</button>
                         <button class="detail-tab" onclick="showDetail('compare')">🔄 对比</button>
+                        <button class="detail-tab" onclick="showDetail('poster')">🖼️ 封面</button>
+                        <button class="detail-tab" onclick="showDetail('fanart')">🎬 背景图</button>
                     </div>
                     
                     <div class="detail-content active" id="detail-overview">
@@ -376,6 +402,20 @@ INDEX_HTML = '''
                                 <h4 style="margin-bottom: 0.5rem;">VSMETA文件内容</h4>
                                 <div id="compare-vsmeta" class="code">无内容</div>
                             </div>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-content" id="detail-poster">
+                        <h4 style="margin-bottom: 0.5rem;">封面图片</h4>
+                        <div class="image-container" id="poster-container">
+                            <div class="image-placeholder">请先选择文件</div>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-content" id="detail-fanart">
+                        <h4 style="margin-bottom: 0.5rem;">背景图片</h4>
+                        <div class="image-container" id="fanart-container">
+                            <div class="image-placeholder">请先选择文件</div>
                         </div>
                     </div>
                 </div>
@@ -475,7 +515,9 @@ INDEX_HTML = '''
             document.querySelectorAll('.detail-tab').forEach(t => 
                 t.classList.toggle('active', t.textContent.includes(tab === 'overview' ? '概览' : 
                     tab === 'nfo' ? 'NFO' : 
-                    tab === 'vsmeta' ? 'VSMETA' : '对比')));
+                    tab === 'vsmeta' ? 'VSMETA' : 
+                    tab === 'compare' ? '对比' :
+                    tab === 'poster' ? '封面' : '背景图')));
             
             document.querySelectorAll('.detail-content').forEach(c => 
                 c.classList.toggle('active', c.id === 'detail-' + tab));
@@ -545,6 +587,16 @@ INDEX_HTML = '''
                             <div>${data.hasVsmeta ? '<span class="badge success">✅ 已生成</span>' : '<span class="badge warning">⏳ 待生成</span>'}</div>
                         </div>
                     </div>
+                    <div style="display:grid; gap:1rem; grid-template-columns:repeat(2, 1fr); margin-top:1rem;">
+                        <div style="background: var(--bg); padding:1rem; border-radius:6px;">
+                            <div style="color:var(--text2); font-size:0.85rem;">封面图片</div>
+                            <div>${data.hasPoster ? '<span class="badge success">✅ 存在</span>' : '<span class="badge warning">⏳ 不存在</span>'}</div>
+                        </div>
+                        <div style="background: var(--bg); padding:1rem; border-radius:6px;">
+                            <div style="color:var(--text2); font-size:0.85rem;">背景图片</div>
+                            <div>${data.hasFanart ? '<span class="badge success">✅ 存在</span>' : '<span class="badge warning">⏳ 不存在</span>'}</div>
+                        </div>
+                    </div>
                     ${data.metadata ? `
                         <div style="margin-top:1.5rem;">
                             <h4 style="margin-bottom:0.75rem;">元数据信息</h4>
@@ -563,6 +615,22 @@ INDEX_HTML = '''
                 
                 document.getElementById('vsmeta-content').textContent = data.vsmetaContent || '无VSMETA内容';
                 document.getElementById('compare-vsmeta').textContent = data.vsmetaContent || '无VSMETA内容';
+                
+                // 更新封面图片
+                const posterContainer = document.getElementById('poster-container');
+                if (data.posterUrl) {
+                    posterContainer.innerHTML = `<img src="${data.posterUrl}" alt="封面" onclick="window.open('${data.posterUrl}', '_blank')" style="cursor: zoom-in;">`;
+                } else {
+                    posterContainer.innerHTML = `<div class="image-placeholder">无封面图片</div>`;
+                }
+                
+                // 更新背景图片
+                const fanartContainer = document.getElementById('fanart-container');
+                if (data.fanartUrl) {
+                    fanartContainer.innerHTML = `<img src="${data.fanartUrl}" alt="背景图" onclick="window.open('${data.fanartUrl}', '_blank')" style="cursor: zoom-in;">`;
+                } else {
+                    fanartContainer.innerHTML = `<div class="image-placeholder">无背景图片</div>`;
+                }
                 
             } catch (e) {
                 console.error('Detail error:', e);
@@ -687,6 +755,32 @@ def api_scan():
 def api_file_detail():
     path = request.args.get('path', '')
     return jsonify(get_file_detail(path))
+
+
+@app.route('/api/image')
+def api_image():
+    path = request.args.get('path', '')
+    if not path or not os.path.exists(path):
+        return jsonify({'error': '文件不存在'}), 404
+    
+    # 安全检查：确保路径是文件
+    if not os.path.isfile(path):
+        return jsonify({'error': '不是文件'}), 400
+    
+    # 获取文件扩展名以确定MIME类型
+    ext = os.path.splitext(path)[1].lower()
+    mimetypes = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.tbn': 'image/jpeg'
+    }
+    mimetype = mimetypes.get(ext, 'application/octet-stream')
+    
+    # 读取并返回图片
+    from flask import send_file
+    return send_file(path, mimetype=mimetype)
 
 
 @app.route('/api/logs', methods=['GET', 'DELETE'])
@@ -863,14 +957,72 @@ def get_file_detail(filepath):
     
     metadata = parse_nfo_metadata(nfo_path)
     
+    # 查找封面和背景图
+    poster_extensions = ['.jpg', '.jpeg', '.png', '.tbn']
+    fanart_extensions = ['.jpg', '.jpeg', '.png']
+    
+    poster_path = None
+    for ext in poster_extensions:
+        if os.path.exists(base + '-poster' + ext):
+            poster_path = base + '-poster' + ext
+            break
+    if not poster_path:
+        for ext in poster_extensions:
+            if os.path.exists(base + ext):
+                poster_path = base + ext
+                break
+    if not poster_path:
+        for ext in poster_extensions:
+            if os.path.exists(os.path.join(os.path.dirname(filepath), 'poster' + ext)):
+                poster_path = os.path.join(os.path.dirname(filepath), 'poster' + ext)
+                break
+    if not poster_path:
+        for ext in poster_extensions:
+            if os.path.exists(os.path.join(os.path.dirname(filepath), 'folder' + ext)):
+                poster_path = os.path.join(os.path.dirname(filepath), 'folder' + ext)
+                break
+    
+    fanart_path = None
+    for ext in fanart_extensions:
+        if os.path.exists(base + '-fanart' + ext):
+            fanart_path = base + '-fanart' + ext
+            break
+    if not fanart_path:
+        for ext in fanart_extensions:
+            if os.path.exists(base + '-banner' + ext):
+                fanart_path = base + '-banner' + ext
+                break
+    if not fanart_path:
+        for ext in fanart_extensions:
+            if os.path.exists(os.path.join(os.path.dirname(filepath), 'fanart' + ext)):
+                fanart_path = os.path.join(os.path.dirname(filepath), 'fanart' + ext)
+                break
+    if not fanart_path:
+        for ext in fanart_extensions:
+            if os.path.exists(os.path.join(os.path.dirname(filepath), 'banner' + ext)):
+                fanart_path = os.path.join(os.path.dirname(filepath), 'banner' + ext)
+                break
+    
+    poster_url = None
+    if poster_path:
+        poster_url = f'/api/image?path={os.path.abspath(poster_path)}'
+    
+    fanart_url = None
+    if fanart_path:
+        fanart_url = f'/api/image?path={os.path.abspath(fanart_path)}'
+    
     return {
         'name': os.path.basename(filepath),
         'dir': os.path.dirname(filepath),
         'hasNfo': os.path.exists(nfo_path),
         'hasVsmeta': os.path.exists(vsmeta_path),
+        'hasPoster': poster_path is not None,
+        'hasFanart': fanart_path is not None,
         'nfoContent': nfo_content,
         'vsmetaContent': vsmeta_content,
-        'metadata': metadata
+        'metadata': metadata,
+        'posterUrl': poster_url,
+        'fanartUrl': fanart_url
     }
 
 
