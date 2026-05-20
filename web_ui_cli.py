@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-NFO to VSMETA 转换器 - 命令行调用版
+NFO to VSMETA 转换器 - Web UI
 ==========================================
-通过subprocess调用命令行来避免signal问题
+通过subprocess调用转换器，支持封面和背景图查看
 """
 
 import argparse
@@ -14,12 +14,11 @@ import time
 import xml.etree.ElementTree as ET
 from datetime import datetime
 import threading
-import json
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
-    from flask import Flask, render_template_string, jsonify, request
+    from flask import Flask, render_template_string, jsonify, request, send_file
     HAS_FLASK = True
 except ImportError:
     HAS_FLASK = False
@@ -59,7 +58,7 @@ INDEX_HTML = '''
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NFO to VSMETA - 命令行版</title>
+    <title>NFO to VSMETA</title>
     <style>
         :root {
             --bg: #0d1117;
@@ -221,6 +220,7 @@ INDEX_HTML = '''
             background: var(--bg);
             padding: 0.5rem;
             border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
         }
         .detail-tab {
             padding: 0.35rem 0.75rem;
@@ -248,6 +248,28 @@ INDEX_HTML = '''
             max-height: 50vh;
         }
         
+        .image-container {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+            text-align: center;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .image-container img {
+            max-width: 100%;
+            max-height: 500px;
+            border-radius: 4px;
+            object-fit: contain;
+        }
+        .image-placeholder {
+            color: var(--text2);
+            font-size: 1.1rem;
+        }
+        
         .log-box {
             background: var(--bg2);
             border: 1px solid var(--border);
@@ -267,155 +289,120 @@ INDEX_HTML = '''
             margin-bottom: 1rem;
             color: var(--warning);
         }
-        
-        .success-alert {
-            background: rgba(63, 185, 80, 0.1);
-            border: 1px solid var(--success);
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            color: var(--success);
-        }
-        
-        .image-container {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 1rem;
-            text-align: center;
-            min-height: 300px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .image-container img {
-            max-width: 100%;
-            max-height: 500px;
-            border-radius: 4px;
-            object-fit: contain;
-        }
-        
-        .image-placeholder {
-            color: var(--text2);
-            font-size: 1.1rem;
-        }
     </style>
 </head>
 <body>
     <div class="header">
-        <div class="logo">🎬 NFO → VSMETA (命令行版)</div>
-        <button class="btn" onclick="toggleTheme()">🌙 主题</button>
+        <div class="logo">🎬 NFO to VSMETA Converter</div>
+        <button class="btn" onclick="toggleTheme()">🌙 Theme</button>
     </div>
     
     <div class="nav">
-        <button class="nav-btn active" onclick="showPage('dashboard')">📊 仪表盘</button>
-        <button class="nav-btn" onclick="showPage('files')">📁 文件管理</button>
-        <button class="nav-btn" onclick="showPage('convert')">🚀 转换</button>
-        <button class="nav-btn" onclick="showPage('logs')">📋 日志</button>
+        <button class="nav-btn active" onclick="showPage('dashboard')">📊 Dashboard</button>
+        <button class="nav-btn" onclick="showPage('files')">📁 Files</button>
+        <button class="nav-btn" onclick="showPage('convert')">🚀 Convert</button>
+        <button class="nav-btn" onclick="showPage('logs')">📋 Logs</button>
     </div>
     
-    <!-- 仪表盘 -->
     <div class="page active" id="page-dashboard">
-        <h2 style="margin-bottom: 1rem;">运行状态</h2>
+        <h2 style="margin-bottom: 1rem;">Status</h2>
         <div class="grid">
             <div class="card">
-                <div class="stat-label">总文件数</div>
+                <div class="stat-label">Total Files</div>
                 <div class="stat-value" id="stat-total">0</div>
             </div>
             <div class="card">
-                <div class="stat-label">已转换</div>
+                <div class="stat-label">Converted</div>
                 <div class="stat-value" style="color: var(--success);" id="stat-success">0</div>
             </div>
             <div class="card">
-                <div class="stat-label">待转换</div>
+                <div class="stat-label">Pending</div>
                 <div class="stat-value" style="color: var(--warning);" id="stat-pending">0</div>
             </div>
             <div class="card">
-                <div class="stat-label">失败</div>
+                <div class="stat-label">Failed</div>
                 <div class="stat-value" style="color: var(--danger);" id="stat-failed">0</div>
             </div>
         </div>
         <div class="card">
-            <h3 style="margin-bottom: 0.5rem;">转换进度</h3>
+            <h3 style="margin-bottom: 0.5rem;">Progress</h3>
             <div class="progress-bar">
                 <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
             </div>
-            <div id="progress-text" style="margin-top: 0.75rem; color: var(--text2);">等待开始...</div>
+            <div id="progress-text" style="margin-top: 0.75rem; color: var(--text2);">Waiting...</div>
         </div>
     </div>
     
-    <!-- 文件管理 -->
     <div class="page" id="page-files">
-        <h2 style="margin-bottom: 1rem;">文件管理</h2>
+        <h2 style="margin-bottom: 1rem;">Files</h2>
         <div style="margin-bottom: 1rem;">
-            <label style="color: var(--text2);">处理目录</label>
-            <input type="text" class="input" id="config-dir" value="/workspace/test_movies" placeholder="/path/to/your/movies">
+            <label style="color: var(--text2);">Directory</label>
+            <input type="text" class="input" id="config-dir" value="/workspace/test_movies" placeholder="/path/to/movies">
             <div style="margin-top: 1rem;">
-                <button class="btn btn-primary" onclick="refreshFiles()">🔄 扫描文件</button>
+                <button class="btn btn-primary" onclick="refreshFiles()">🔄 Scan Files</button>
             </div>
         </div>
         
         <div class="two-col">
             <div>
-                <h3 style="margin-bottom: 0.75rem;">文件列表</h3>
+                <h3 style="margin-bottom: 0.75rem;">File List</h3>
                 <div class="tree" id="file-tree">
-                    <div style="color: var(--text2); padding: 1rem; text-align: center;">点击上方「扫描文件」按钮加载文件列表</div>
+                    <div style="color: var(--text2); padding: 1rem; text-align: center;">Click "Scan Files" to load files</div>
                 </div>
             </div>
             
             <div>
-                <h3 style="margin-bottom: 0.75rem;">文件详情</h3>
+                <h3 style="margin-bottom: 0.75rem;">File Details</h3>
                 <div class="detail">
                     <div class="detail-tabs">
-                        <button class="detail-tab active" onclick="showDetail('overview')">📋 概览</button>
+                        <button class="detail-tab active" onclick="showDetail('overview')">📋 Overview</button>
                         <button class="detail-tab" onclick="showDetail('nfo')">📄 NFO</button>
                         <button class="detail-tab" onclick="showDetail('vsmeta')">📝 VSMETA</button>
-                        <button class="detail-tab" onclick="showDetail('compare')">🔄 对比</button>
-                        <button class="detail-tab" onclick="showDetail('poster')">🖼️ 封面</button>
-                        <button class="detail-tab" onclick="showDetail('fanart')">🎬 背景图</button>
+                        <button class="detail-tab" onclick="showDetail('compare')">🔄 Compare</button>
+                        <button class="detail-tab" onclick="showDetail('poster')">🖼️ Poster</button>
+                        <button class="detail-tab" onclick="showDetail('fanart')">🎬 Fanart</button>
                     </div>
                     
                     <div class="detail-content active" id="detail-overview">
                         <div id="overview-empty" style="color: var(--text2); padding: 2rem; text-align: center;">
                             <div style="font-size: 2.5rem; margin-bottom: 1rem;">👈</div>
-                            <div>请在左侧文件列表中选择一个文件查看详情</div>
+                            <div>Select a file from the list to view details</div>
                         </div>
                         <div id="overview-content"></div>
                     </div>
                     
                     <div class="detail-content" id="detail-nfo">
-                        <div id="nfo-content" class="code">无NFO内容</div>
+                        <div id="nfo-content" class="code">No NFO content</div>
                     </div>
                     
                     <div class="detail-content" id="detail-vsmeta">
-                        <div id="vsmeta-content" class="code">无VSMETA内容</div>
+                        <div id="vsmeta-content" class="code">No VSMETA content</div>
                     </div>
                     
                     <div class="detail-content" id="detail-compare">
                         <div class="compare">
                             <div>
-                                <h4 style="margin-bottom: 0.5rem;">NFO文件内容</h4>
-                                <div id="compare-nfo" class="code">无内容</div>
+                                <h4 style="margin-bottom: 0.5rem;">NFO Content</h4>
+                                <div id="compare-nfo" class="code">No content</div>
                             </div>
                             <div>
-                                <h4 style="margin-bottom: 0.5rem;">VSMETA文件内容</h4>
-                                <div id="compare-vsmeta" class="code">无内容</div>
+                                <h4 style="margin-bottom: 0.5rem;">VSMETA Content</h4>
+                                <div id="compare-vsmeta" class="code">No content</div>
                             </div>
                         </div>
                     </div>
                     
                     <div class="detail-content" id="detail-poster">
-                        <h4 style="margin-bottom: 0.5rem;">封面图片</h4>
+                        <h4 style="margin-bottom: 0.5rem;">Poster Image</h4>
                         <div class="image-container" id="poster-container">
-                            <div class="image-placeholder">请先选择文件</div>
+                            <div class="image-placeholder">Select a file first</div>
                         </div>
                     </div>
                     
                     <div class="detail-content" id="detail-fanart">
-                        <h4 style="margin-bottom: 0.5rem;">背景图片</h4>
+                        <h4 style="margin-bottom: 0.5rem;">Fanart Image</h4>
                         <div class="image-container" id="fanart-container">
-                            <div class="image-placeholder">请先选择文件</div>
+                            <div class="image-placeholder">Select a file first</div>
                         </div>
                     </div>
                 </div>
@@ -423,60 +410,47 @@ INDEX_HTML = '''
         </div>
     </div>
     
-    <!-- 转换控制 -->
     <div class="page" id="page-convert">
-        <h2 style="margin-bottom: 1rem;">🚀 开始转换</h2>
+        <h2 style="margin-bottom: 1rem;">🚀 Convert</h2>
         
         <div class="alert">
-            ⚠️ 此版本通过命令行调用转换器，稳定可靠！
+            ⚠️ This version uses subprocess to call the converter, stable and reliable!
         </div>
         
         <div class="card">
-            <h3 style="margin-bottom: 1rem;">转换设置</h3>
+            <h3 style="margin-bottom: 1rem;">Settings</h3>
             <div style="margin-bottom: 1rem;">
-                <label style="color: var(--text2);">处理目录</label>
+                <label style="color: var(--text2);">Directory</label>
                 <input type="text" class="input" id="convert-dir" value="/workspace/test_movies">
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div>
-                    <label style="color: var(--text2);">工作线程数</label>
+                    <label style="color: var(--text2);">Workers</label>
                     <input type="number" class="input" id="workers" value="4">
                 </div>
                 <div>
-                    <label style="color: var(--text2);">其他选项</label>
+                    <label style="color: var(--text2);">Options</label>
                     <div style="margin-top: 0.75rem;">
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" id="overwrite"> 覆盖已有VSMETA
+                            <input type="checkbox" id="overwrite"> Overwrite existing VSMETA
                         </label>
                     </div>
                 </div>
             </div>
             <div>
-                <button class="btn btn-primary" id="btn-start" onclick="startConversion()">▶️ 开始转换</button>
-                <button class="btn btn-danger" id="btn-stop" onclick="stopConversion()" style="display:none;">⏹️ 停止转换</button>
-            </div>
-        </div>
-        
-        <div class="card" style="margin-top: 1rem;">
-            <h3 style="margin-bottom: 0.75rem;">工作原理</h3>
-            <div style="color: var(--text2); line-height: 1.8;">
-                <p>此版本通过命令行调用转换器：</p>
-                <p>1. 使用Python subprocess执行转换脚本</p>
-                <p>2. 完全避免Flask中的signal问题</p>
-                <p>3. 实时捕获命令行输出</p>
-                <p>4. 稳定可靠，不易出错</p>
+                <button class="btn btn-primary" id="btn-start" onclick="startConversion()">▶️ Start Convert</button>
+                <button class="btn btn-danger" id="btn-stop" onclick="stopConversion()" style="display:none;">⏹️ Stop Convert</button>
             </div>
         </div>
     </div>
     
-    <!-- 日志 -->
     <div class="page" id="page-logs">
-        <h2 style="margin-bottom: 1rem;">运行日志</h2>
+        <h2 style="margin-bottom: 1rem;">Logs</h2>
         <div style="margin-bottom: 1rem;">
-            <button class="btn" onclick="refreshLogs()">🔄 刷新日志</button>
-            <button class="btn" onclick="clearLogs()">🗑️ 清空日志</button>
+            <button class="btn" onclick="refreshLogs()">🔄 Refresh</button>
+            <button class="btn" onclick="clearLogs()">🗑️ Clear</button>
         </div>
-        <div class="log-box" id="log-box">暂无日志</div>
+        <div class="log-box" id="log-box">No logs</div>
     </div>
     
     <script>
@@ -496,9 +470,7 @@ INDEX_HTML = '''
         
         function showPage(pageName) {
             document.querySelectorAll('.nav-btn').forEach(btn => 
-                btn.classList.toggle('active', btn.textContent.includes(pageName === 'dashboard' ? '仪表盘' : 
-                    pageName === 'files' ? '文件' : 
-                    pageName === 'convert' ? '转换' : '日志')));
+                btn.classList.toggle('active', btn.textContent.includes(pageName)));
             
             document.querySelectorAll('.page').forEach(page => 
                 page.classList.toggle('active', page.id === 'page-' + pageName));
@@ -513,11 +485,7 @@ INDEX_HTML = '''
         
         function showDetail(tab) {
             document.querySelectorAll('.detail-tab').forEach(t => 
-                t.classList.toggle('active', t.textContent.includes(tab === 'overview' ? '概览' : 
-                    tab === 'nfo' ? 'NFO' : 
-                    tab === 'vsmeta' ? 'VSMETA' : 
-                    tab === 'compare' ? '对比' :
-                    tab === 'poster' ? '封面' : '背景图')));
+                t.classList.toggle('active', t.textContent.includes(tab)));
             
             document.querySelectorAll('.detail-content').forEach(c => 
                 c.classList.toggle('active', c.id === 'detail-' + tab));
@@ -525,7 +493,7 @@ INDEX_HTML = '''
         
         async function refreshFiles() {
             const dir = document.getElementById('config-dir').value;
-            document.getElementById('file-tree').innerHTML = '<div style="text-align:center; padding:1rem;">正在扫描...</div>';
+            document.getElementById('file-tree').innerHTML = '<div style="text-align:center; padding:1rem;">Scanning...</div>';
             
             try {
                 const data = await api('/api/scan?dir=' + encodeURIComponent(dir));
@@ -541,7 +509,7 @@ INDEX_HTML = '''
             const container = document.getElementById('file-tree');
             
             if (!scanResults.length) {
-                container.innerHTML = '<div style="text-align:center; padding:2rem; color:var(--text2);">没有找到视频文件<br><br>请确保目录中有以下格式的视频文件：<br>.mp4, .mkv, .avi, .ts, .mov</div>';
+                container.innerHTML = '<div style="text-align:center; padding:2rem; color:var(--text2);">No video files found<br><br>Supported formats: .mp4, .mkv, .avi, .ts, .mov</div>';
                 return;
             }
             
@@ -571,65 +539,63 @@ INDEX_HTML = '''
                 document.getElementById('overview-content').innerHTML = `
                     <div style="display:grid; gap:1rem; grid-template-columns:repeat(2, 1fr);">
                         <div style="background: var(--bg); padding:1rem; border-radius:6px;">
-                            <div style="color:var(--text2); font-size:0.85rem;">文件名</div>
+                            <div style="color:var(--text2); font-size:0.85rem;">Filename</div>
                             <div style="font-weight:600;">${data.name || '-'}</div>
                         </div>
                         <div style="background: var(--bg); padding:1rem; border-radius:6px;">
-                            <div style="color:var(--text2); font-size:0.85rem;">目录</div>
+                            <div style="color:var(--text2); font-size:0.85rem;">Directory</div>
                             <div style="font-size:0.9rem; color:var(--text2);">${data.dir || '-'}</div>
                         </div>
                         <div style="background: var(--bg); padding:1rem; border-radius:6px;">
-                            <div style="color:var(--text2); font-size:0.85rem;">NFO状态</div>
-                            <div>${data.hasNfo ? '<span class="badge success">✅ 存在</span>' : '<span class="badge danger">❌ 不存在</span>'}</div>
+                            <div style="color:var(--text2); font-size:0.85rem;">NFO</div>
+                            <div>${data.hasNfo ? '<span class="badge success">✅ Present</span>' : '<span class="badge danger">❌ Missing</span>'}</div>
                         </div>
                         <div style="background: var(--bg); padding:1rem; border-radius:6px;">
-                            <div style="color:var(--text2); font-size:0.85rem;">VSMETA状态</div>
-                            <div>${data.hasVsmeta ? '<span class="badge success">✅ 已生成</span>' : '<span class="badge warning">⏳ 待生成</span>'}</div>
+                            <div style="color:var(--text2); font-size:0.85rem;">VSMETA</div>
+                            <div>${data.hasVsmeta ? '<span class="badge success">✅ Present</span>' : '<span class="badge warning">⏳ Missing</span>'}</div>
                         </div>
                     </div>
                     <div style="display:grid; gap:1rem; grid-template-columns:repeat(2, 1fr); margin-top:1rem;">
                         <div style="background: var(--bg); padding:1rem; border-radius:6px;">
-                            <div style="color:var(--text2); font-size:0.85rem;">封面图片</div>
-                            <div>${data.hasPoster ? '<span class="badge success">✅ 存在</span>' : '<span class="badge warning">⏳ 不存在</span>'}</div>
+                            <div style="color:var(--text2); font-size:0.85rem;">Poster</div>
+                            <div>${data.hasPoster ? '<span class="badge success">✅ Present</span>' : '<span class="badge warning">⏳ Missing</span>'}</div>
                         </div>
                         <div style="background: var(--bg); padding:1rem; border-radius:6px;">
-                            <div style="color:var(--text2); font-size:0.85rem;">背景图片</div>
-                            <div>${data.hasFanart ? '<span class="badge success">✅ 存在</span>' : '<span class="badge warning">⏳ 不存在</span>'}</div>
+                            <div style="color:var(--text2); font-size:0.85rem;">Fanart</div>
+                            <div>${data.hasFanart ? '<span class="badge success">✅ Present</span>' : '<span class="badge warning">⏳ Missing</span>'}</div>
                         </div>
                     </div>
                     ${data.metadata ? `
                         <div style="margin-top:1.5rem;">
-                            <h4 style="margin-bottom:0.75rem;">元数据信息</h4>
+                            <h4 style="margin-bottom:0.75rem;">Metadata</h4>
                             <div style="background: var(--bg); padding:1rem; border-radius:6px;">
-                                <div style="margin-bottom:0.5rem;"><strong>标题:</strong> ${data.metadata.title || '-'}</div>
-                                <div style="margin-bottom:0.5rem;"><strong>年份:</strong> ${data.metadata.year || '-'}</div>
-                                <div style="margin-bottom:0.5rem;"><strong>评分:</strong> ${data.metadata.rating || '-'}</div>
-                                <div><strong>简介:</strong> ${data.metadata.plot || '-'}</div>
+                                <div style="margin-bottom:0.5rem;"><strong>Title:</strong> ${data.metadata.title || '-'}</div>
+                                <div style="margin-bottom:0.5rem;"><strong>Year:</strong> ${data.metadata.year || '-'}</div>
+                                <div style="margin-bottom:0.5rem;"><strong>Rating:</strong> ${data.metadata.rating || '-'}</div>
+                                <div><strong>Plot:</strong> ${data.metadata.plot || '-'}</div>
                             </div>
                         </div>
                     ` : ''}
                 `;
                 
-                document.getElementById('nfo-content').textContent = data.nfoContent || '无NFO内容';
-                document.getElementById('compare-nfo').textContent = data.nfoContent || '无NFO内容';
+                document.getElementById('nfo-content').textContent = data.nfoContent || 'No NFO content';
+                document.getElementById('compare-nfo').textContent = data.nfoContent || 'No NFO content';
                 
-                document.getElementById('vsmeta-content').textContent = data.vsmetaContent || '无VSMETA内容';
-                document.getElementById('compare-vsmeta').textContent = data.vsmetaContent || '无VSMETA内容';
+                document.getElementById('vsmeta-content').textContent = data.vsmetaContent || 'No VSMETA content';
+                document.getElementById('compare-vsmeta').textContent = data.vsmetaContent || 'No VSMETA content';
                 
-                // 更新封面图片
                 const posterContainer = document.getElementById('poster-container');
                 if (data.posterUrl) {
-                    posterContainer.innerHTML = `<img src="${data.posterUrl}" alt="封面" onclick="window.open('${data.posterUrl}', '_blank')" style="cursor: zoom-in;">`;
+                    posterContainer.innerHTML = `<img src="${data.posterUrl}" alt="Poster" onclick="window.open('${data.posterUrl}', '_blank')" style="cursor: zoom-in;">`;
                 } else {
-                    posterContainer.innerHTML = `<div class="image-placeholder">无封面图片</div>`;
+                    posterContainer.innerHTML = '<div class="image-placeholder">No poster image</div>';
                 }
                 
-                // 更新背景图片
                 const fanartContainer = document.getElementById('fanart-container');
                 if (data.fanartUrl) {
-                    fanartContainer.innerHTML = `<img src="${data.fanartUrl}" alt="背景图" onclick="window.open('${data.fanartUrl}', '_blank')" style="cursor: zoom-in;">`;
+                    fanartContainer.innerHTML = `<img src="${data.fanartUrl}" alt="Fanart" onclick="window.open('${data.fanartUrl}', '_blank')" style="cursor: zoom-in;">`;
                 } else {
-                    fanartContainer.innerHTML = `<div class="image-placeholder">无背景图片</div>`;
+                    fanartContainer.innerHTML = '<div class="image-placeholder">No fanart image</div>';
                 }
                 
             } catch (e) {
@@ -648,7 +614,7 @@ INDEX_HTML = '''
                 
                 const pct = p.total > 0 ? Math.round((p.completed / p.total) * 100) : 0;
                 document.getElementById('progress-fill').style.width = pct + '%';
-                document.getElementById('progress-text').textContent = p.currentFile ? `正在转换: ${p.currentFile} (${p.completed}/${p.total})` : '等待开始...';
+                document.getElementById('progress-text').textContent = p.currentFile ? `Converting: ${p.currentFile} (${p.completed}/${p.total})` : 'Waiting...';
                 
                 document.getElementById('btn-start').style.display = data.is_running ? 'none' : 'inline-block';
                 document.getElementById('btn-stop').style.display = data.is_running ? 'inline-block' : 'none';
@@ -684,7 +650,7 @@ INDEX_HTML = '''
                 
                 const container = document.getElementById('log-box');
                 if (!logs.length) {
-                    container.innerHTML = '<div>暂无日志</div>';
+                    container.innerHTML = '<div>No logs</div>';
                     return;
                 }
                 
@@ -704,23 +670,20 @@ INDEX_HTML = '''
         async function clearLogs() {
             try {
                 await api('/api/logs', 'DELETE');
-                document.getElementById('log-box').innerHTML = '<div>暂无日志</div>';
+                document.getElementById('log-box').innerHTML = '<div>No logs</div>';
             } catch (e) {
                 console.error(e);
             }
         }
         
-        // 初始化
         const savedTheme = localStorage.getItem('theme');
         if (savedTheme) {
             document.documentElement.setAttribute('data-theme', savedTheme);
         }
         
-        // 定期刷新
         setInterval(refreshStats, 2000);
         setInterval(refreshLogs, 3000);
         
-        // 初始化数据
         refreshStats();
     </script>
 </body>
@@ -728,98 +691,92 @@ INDEX_HTML = '''
 '''
 
 
-@app.route('/')
-def index():
-    return render_template_string(INDEX_HTML)
-
-
-@app.route('/api/status')
-def api_status():
-    return jsonify({
-        'is_running': _state['is_running'],
-        'progress': _state['progress']
-    })
-
-
-@app.route('/api/scan')
-def api_scan():
-    directory = request.args.get('dir', '/workspace/test_movies')
-    files = scan_directory(directory)
-    _state['scan_results'] = files
-    _state['progress']['total'] = len(files)
-    _add_log('info', f'扫描完成，找到 {len(files)} 个视频文件')
-    return jsonify({'files': files})
-
-
-@app.route('/api/file-detail')
-def api_file_detail():
-    path = request.args.get('path', '')
-    return jsonify(get_file_detail(path))
-
-
-@app.route('/api/image')
-def api_image():
-    path = request.args.get('path', '')
-    if not path or not os.path.exists(path):
-        return jsonify({'error': '文件不存在'}), 404
+if HAS_FLASK:
+    @app.route('/')
+    def index():
+        return render_template_string(INDEX_HTML)
     
-    # 安全检查：确保路径是文件
-    if not os.path.isfile(path):
-        return jsonify({'error': '不是文件'}), 400
     
-    # 获取文件扩展名以确定MIME类型
-    ext = os.path.splitext(path)[1].lower()
-    mimetypes = {
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.png': 'image/png',
-        '.gif': 'image/gif',
-        '.tbn': 'image/jpeg'
-    }
-    mimetype = mimetypes.get(ext, 'application/octet-stream')
+    @app.route('/api/status')
+    def api_status():
+        return jsonify({
+            'is_running': _state['is_running'],
+            'progress': _state['progress']
+        })
     
-    # 读取并返回图片
-    from flask import send_file
-    return send_file(path, mimetype=mimetype)
-
-
-@app.route('/api/logs', methods=['GET', 'DELETE'])
-def api_logs():
-    if request.method == 'DELETE':
-        _state['logs'] = []
-    return jsonify({'logs': _state['logs']})
-
-
-@app.route('/api/convert/start', methods=['POST'])
-def api_convert_start():
-    if _state['is_running']:
-        return jsonify({'success': False, 'error': '转换进行中'})
     
-    data = request.get_json(silent=True) or {}
-    directory = data.get('dir', '/workspace/test_movies')
+    @app.route('/api/scan')
+    def api_scan():
+        directory = request.args.get('dir', '/workspace/test_movies')
+        files = scan_directory(directory)
+        _state['scan_results'] = files
+        _state['progress']['total'] = len(files)
+        _add_log('info', f'Scan complete, found {len(files)} video files')
+        return jsonify({'files': files})
     
-    _state['is_running'] = True
-    _state['progress']['completed'] = 0
-    _state['progress']['success'] = 0
-    _state['progress']['failed'] = 0
-    _state['progress']['current_file'] = ''
     
-    # 在后台线程中通过命令行调用转换器
-    threading.Thread(target=run_conversion_cli, args=(directory,), daemon=True).start()
-    return jsonify({'success': True})
-
-
-@app.route('/api/convert/stop', methods=['POST'])
-def api_convert_stop():
-    _state['is_running'] = False
-    _add_log('info', '转换任务已停止')
-    return jsonify({'success': True})
+    @app.route('/api/file-detail')
+    def api_file_detail():
+        path = request.args.get('path', '')
+        return jsonify(get_file_detail(path))
+    
+    
+    @app.route('/api/image')
+    def api_image():
+        path = request.args.get('path', '')
+        if not path or not os.path.exists(path):
+            return jsonify({'error': 'File not found'}), 404
+        
+        if not os.path.isfile(path):
+            return jsonify({'error': 'Not a file'}), 400
+        
+        ext = os.path.splitext(path)[1].lower()
+        mimetypes = {
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.gif': 'image/gif',
+            '.tbn': 'image/jpeg'
+        }
+        mimetype = mimetypes.get(ext, 'application/octet-stream')
+        
+        return send_file(path, mimetype=mimetype)
+    
+    
+    @app.route('/api/logs', methods=['GET', 'DELETE'])
+    def api_logs():
+        if request.method == 'DELETE':
+            _state['logs'] = []
+        return jsonify({'logs': _state['logs']})
+    
+    
+    @app.route('/api/convert/start', methods=['POST'])
+    def api_convert_start():
+        if _state['is_running']:
+            return jsonify({'success': False, 'error': 'Conversion in progress'})
+        
+        data = request.get_json(silent=True) or {}
+        directory = data.get('dir', '/workspace/test_movies')
+        
+        _state['is_running'] = True
+        _state['progress']['completed'] = 0
+        _state['progress']['success'] = 0
+        _state['progress']['failed'] = 0
+        _state['progress']['current_file'] = ''
+        
+        threading.Thread(target=run_conversion_cli, args=(directory,), daemon=True).start()
+        return jsonify({'success': True})
+    
+    
+    @app.route('/api/convert/stop', methods=['POST'])
+    def api_convert_stop():
+        _state['is_running'] = False
+        _add_log('info', 'Conversion stopped')
+        return jsonify({'success': True})
 
 
 def run_conversion_cli(directory):
-    """通过命令行调用转换器"""
     try:
-        # 构建命令行
         cmd = [
             sys.executable,
             '-c',
@@ -833,14 +790,11 @@ config.directory = "{directory}"
 config.max_workers = 4
 
 converter = NFOToVSMETAConverter(config)
-
-# 扫描文件
 files = converter.file_scanner.scan()
 
-# 处理每个文件
-for directory, filename in files:
+for dirname, filename in files:
     try:
-        result = converter._process_single_file(directory, filename)
+        result = converter._process_single_file(dirname, filename)
         if result.get('success'):
             print(f"SUCCESS: {{filename}}")
         else:
@@ -850,9 +804,8 @@ for directory, filename in files:
 '''
         ]
         
-        _add_log('info', '开始命令行转换...')
+        _add_log('info', 'Starting conversion...')
         
-        # 执行命令行
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -861,7 +814,6 @@ for directory, filename in files:
             bufsize=1
         )
         
-        # 实时读取输出
         for line in process.stdout:
             line = line.strip()
             if line:
@@ -876,14 +828,13 @@ for directory, filename in files:
         
         process.wait()
         
-        # 重新扫描以更新状态
         files = scan_directory(directory)
         _state['scan_results'] = files
         
-        _add_log('success', f'转换完成！成功: {_state["progress"]["success"]}, 失败: {_state["progress"]["failed"]}')
+        _add_log('success', f'Conversion complete! Success: {_state["progress"]["success"]}, Failed: {_state["progress"]["failed"]}')
         
     except Exception as e:
-        _add_log('error', f'命令行转换失败: {str(e)}')
+        _add_log('error', f'Conversion failed: {str(e)}')
     finally:
         _state['is_running'] = False
         _state['progress']['current_file'] = ''
@@ -892,7 +843,7 @@ for directory, filename in files:
 def scan_directory(directory):
     results = []
     if not os.path.exists(directory):
-        _add_log('warning', f'目录不存在: {directory}')
+        _add_log('warning', f'Directory not found: {directory}')
         return results
     
     try:
@@ -907,13 +858,13 @@ def scan_directory(directory):
                     
                     if has_nfo and has_vsmeta:
                         status_class = 'success'
-                        status_text = '已转换'
+                        status_text = 'Converted'
                     elif has_nfo:
                         status_class = 'warning'
-                        status_text = '待转换'
+                        status_text = 'Pending'
                     else:
                         status_class = 'danger'
-                        status_text = '无NFO'
+                        status_text = 'No NFO'
                     
                     results.append({
                         'name': filename,
@@ -925,7 +876,7 @@ def scan_directory(directory):
                         'statusText': status_text
                     })
     except Exception as e:
-        _add_log('error', f'扫描目录失败: {e}')
+        _add_log('error', f'Scan failed: {e}')
     
     return results
 
@@ -941,7 +892,7 @@ def get_file_detail(filepath):
             with open(nfo_path, 'r', encoding='utf-8', errors='replace') as f:
                 nfo_content = f.read(10000)
         except Exception as e:
-            nfo_content = f'无法读取: {e}'
+            nfo_content = f'Cannot read: {e}'
     
     vsmeta_content = ''
     if os.path.exists(vsmeta_path):
@@ -951,13 +902,12 @@ def get_file_detail(filepath):
                 try:
                     vsmeta_content = raw.decode('utf-8', errors='replace')
                 except Exception:
-                    vsmeta_content = f'[二进制文件, {len(raw)} bytes]'
+                    vsmeta_content = f'[Binary, {len(raw)} bytes]'
         except Exception as e:
-            vsmeta_content = f'无法读取: {e}'
+            vsmeta_content = f'Cannot read: {e}'
     
     metadata = parse_nfo_metadata(nfo_path)
     
-    # 查找封面和背景图
     poster_extensions = ['.jpg', '.jpeg', '.png', '.tbn']
     fanart_extensions = ['.jpg', '.jpeg', '.png']
     
@@ -1058,19 +1008,19 @@ def parse_nfo_metadata(nfo_path):
 
 def main():
     if not HAS_FLASK:
-        print('请先安装: pip install flask')
+        print('Please install Flask first: pip install flask')
         return
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('--host', default='0.0.0.0', help='监听地址')
-    parser.add_argument('--port', type=int, default=8003, help='端口')
+    parser.add_argument('--host', default='0.0.0.0', help='Host address')
+    parser.add_argument('--port', type=int, default=8004, help='Port number')
     args = parser.parse_args()
     
     print(f'''
 ╔══════════════════════════════════════════╗
-║   NFO → VSMETA (命令行调用版)    ║
+║   NFO to VSMETA Converter Web UI        ║
 ╠══════════════════════════════════════════╣
-║   访问地址: http://localhost:{args.port:<5}    ║
+║   Access: http://localhost:{args.port:<5}    ║
 ╚══════════════════════════════════════════╝
     ''')
     
