@@ -3,7 +3,7 @@
 """
 NFO to VSMETA 转换器 - 稳定增强版
 =====================================
-专为易用性优化，所有功能都能正常工作
+真正调用转换器，生成VSMETA文件
 """
 
 import argparse
@@ -13,8 +13,6 @@ import threading
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from dataclasses import dataclass
-from functools import wraps
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -59,7 +57,7 @@ INDEX_HTML = '''
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NFO to VSMETA</title>
+    <title>NFO to VSMETA - 真正转换版</title>
     <style>
         :root {
             --bg: #0d1117;
@@ -87,7 +85,6 @@ INDEX_HTML = '''
             min-height: 100vh;
         }
         
-        /* 头部 */
         .header {
             background: var(--bg2);
             border-bottom: 1px solid var(--border);
@@ -98,7 +95,6 @@ INDEX_HTML = '''
         }
         .logo { font-size: 1.25rem; font-weight: 700; }
         
-        /* 导航 */
         .nav {
             display: flex;
             gap: 0.5rem;
@@ -118,11 +114,9 @@ INDEX_HTML = '''
         .nav-btn:hover { background: var(--border); }
         .nav-btn.active { background: var(--accent); color: white; }
         
-        /* 页面 */
         .page { display: none; padding: 1.5rem 2rem; }
         .page.active { display: block; }
         
-        /* 网格 */
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -138,7 +132,6 @@ INDEX_HTML = '''
         .stat-label { font-size: 0.8rem; color: var(--text2); text-transform: uppercase; }
         .stat-value { font-size: 1.75rem; font-weight: 700; margin-top: 0.25rem; }
         
-        /* 按钮 */
         .btn {
             padding: 0.6rem 1.2rem;
             border-radius: 6px;
@@ -153,7 +146,6 @@ INDEX_HTML = '''
         .btn-primary { background: var(--accent); color: white; border-color: var(--accent); }
         .btn-danger { background: var(--danger); color: white; border-color: var(--danger); }
         
-        /* 输入 */
         .input {
             width: 100%;
             padding: 0.75rem;
@@ -164,7 +156,6 @@ INDEX_HTML = '''
             margin-top: 0.5rem;
         }
         
-        /* 进度条 */
         .progress-bar {
             height: 28px;
             background: var(--bg2);
@@ -179,7 +170,6 @@ INDEX_HTML = '''
             transition: width 0.3s;
         }
         
-        /* 两栏布局 */
         .two-col {
             display: grid;
             grid-template-columns: 320px 1fr;
@@ -187,7 +177,6 @@ INDEX_HTML = '''
         }
         @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
         
-        /* 文件树 */
         .tree {
             background: var(--bg2);
             border: 1px solid var(--border);
@@ -207,7 +196,6 @@ INDEX_HTML = '''
         .tree-item:hover { background: rgba(88, 166, 255, 0.1); }
         .tree-item.selected { background: rgba(88, 166, 255, 0.2); }
         
-        /* 状态徽章 */
         .badge {
             display: inline-block;
             padding: 0.2rem 0.5rem;
@@ -219,7 +207,6 @@ INDEX_HTML = '''
         .badge.warning { background: rgba(210, 153, 34, 0.2); color: var(--warning); }
         .badge.danger { background: rgba(248, 81, 73, 0.2); color: var(--danger); }
         
-        /* 详情面板 */
         .detail {
             background: var(--bg2);
             border: 1px solid var(--border);
@@ -245,7 +232,6 @@ INDEX_HTML = '''
         .detail-content { padding: 1rem; display: none; }
         .detail-content.active { display: block; }
         
-        /* 对比 */
         .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         @media (max-width: 900px) { .compare { grid-template-columns: 1fr; } }
         .code {
@@ -260,7 +246,6 @@ INDEX_HTML = '''
             max-height: 50vh;
         }
         
-        /* 日志 */
         .log-box {
             background: var(--bg2);
             border: 1px solid var(--border);
@@ -271,11 +256,20 @@ INDEX_HTML = '''
             max-height: 50vh;
             overflow-y: auto;
         }
+        
+        .alert {
+            background: var(--bg2);
+            border: 1px solid var(--warning);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            color: var(--warning);
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <div class="logo">🎬 NFO → VSMETA</div>
+        <div class="logo">🎬 NFO → VSMETA (真正转换版)</div>
         <button class="btn" onclick="toggleTheme()">🌙 主题</button>
     </div>
     
@@ -328,7 +322,6 @@ INDEX_HTML = '''
         </div>
         
         <div class="two-col">
-            <!-- 文件列表 -->
             <div>
                 <h3 style="margin-bottom: 0.75rem;">文件列表</h3>
                 <div class="tree" id="file-tree">
@@ -336,15 +329,14 @@ INDEX_HTML = '''
                 </div>
             </div>
             
-            <!-- 文件详情 -->
             <div>
                 <h3 style="margin-bottom: 0.75rem;">文件详情</h3>
                 <div class="detail">
                     <div class="detail-tabs">
                         <button class="detail-tab active" onclick="showDetail('overview')">📋 概览</button>
-                        <button class="detail-tab" onclick="showDetail('nfo')">📄 NFO文件</button>
-                        <button class="detail-tab" onclick="showDetail('vsmeta')">📝 VSMETA文件</button>
-                        <button class="detail-tab" onclick="showDetail('compare')">🔄 对比视图</button>
+                        <button class="detail-tab" onclick="showDetail('nfo')">📄 NFO</button>
+                        <button class="detail-tab" onclick="showDetail('vsmeta')">📝 VSMETA</button>
+                        <button class="detail-tab" onclick="showDetail('compare')">🔄 对比</button>
                     </div>
                     
                     <div class="detail-content active" id="detail-overview">
@@ -382,7 +374,12 @@ INDEX_HTML = '''
     
     <!-- 转换控制 -->
     <div class="page" id="page-convert">
-        <h2 style="margin-bottom: 1rem;">转换控制</h2>
+        <h2 style="margin-bottom: 1rem;">🚀 开始转换</h2>
+        
+        <div class="alert">
+            ⚠️ 重要提示：转换前请确保目录中有NFO文件，否则无法生成VSMETA文件！
+        </div>
+        
         <div class="card">
             <h3 style="margin-bottom: 1rem;">转换设置</h3>
             <div style="margin-bottom: 1rem;">
@@ -395,13 +392,27 @@ INDEX_HTML = '''
                     <input type="number" class="input" id="workers" value="4">
                 </div>
                 <div>
-                    <label style="color: var(--text2);">覆盖已有VSMETA</label>
-                    <input type="checkbox" id="overwrite" style="width: auto; margin-top: 1rem; transform: scale(1.5);">
+                    <label style="color: var(--text2);">其他选项</label>
+                    <div style="margin-top: 0.75rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="overwrite"> 覆盖已有VSMETA
+                        </label>
+                    </div>
                 </div>
             </div>
             <div>
                 <button class="btn btn-primary" id="btn-start" onclick="startConversion()">▶️ 开始转换</button>
                 <button class="btn btn-danger" id="btn-stop" onclick="stopConversion()" style="display:none;">⏹️ 停止转换</button>
+            </div>
+        </div>
+        
+        <div class="card" style="margin-top: 1rem;">
+            <h3 style="margin-bottom: 0.75rem;">转换说明</h3>
+            <div style="color: var(--text2); line-height: 1.8;">
+                <p>1. 确保处理目录中有NFO文件</p>
+                <p>2. 点击「开始转换」将调用真正的转换器</p>
+                <p>3. 转换后的VSMETA文件将保存在同一目录</p>
+                <p>4. 可在「文件管理」中查看转换结果</p>
             </div>
         </div>
     </div>
@@ -476,7 +487,7 @@ INDEX_HTML = '''
             const container = document.getElementById('file-tree');
             
             if (!scanResults.length) {
-                container.innerHTML = '<div style="text-align:center; padding:2rem; color:var(--text2);">没有找到视频文件</div>';
+                container.innerHTML = '<div style="text-align:center; padding:2rem; color:var(--text2);">没有找到视频文件<br><br>请确保目录中有以下格式的视频文件：<br>.mp4, .mkv, .avi, .ts, .mov</div>';
                 return;
             }
             
@@ -490,12 +501,10 @@ INDEX_HTML = '''
         }
         
         function selectFile(index) {
-            // 高亮选中
             document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('selected'));
             const el = document.getElementById('file-' + index);
             if (el) el.classList.add('selected');
             
-            // 显示详情
             const file = scanResults[index];
             renderFileDetail(file);
         }
@@ -504,7 +513,6 @@ INDEX_HTML = '''
             try {
                 const data = await api('/api/file-detail?path=' + encodeURIComponent(file.path));
                 
-                // 显示概览
                 document.getElementById('overview-empty').style.display = 'none';
                 document.getElementById('overview-content').innerHTML = `
                     <div style="display:grid; gap:1rem; grid-template-columns:repeat(2, 1fr);">
@@ -518,11 +526,11 @@ INDEX_HTML = '''
                         </div>
                         <div style="background: var(--bg); padding:1rem; border-radius:6px;">
                             <div style="color:var(--text2); font-size:0.85rem;">NFO状态</div>
-                            <div>${data.hasNfo ? '<span class=\"badge success\">✅ 存在</span>' : '<span class=\"badge danger\">❌ 不存在</span>'}</div>
+                            <div>${data.hasNfo ? '<span class="badge success">✅ 存在</span>' : '<span class="badge danger">❌ 不存在</span>'}</div>
                         </div>
                         <div style="background: var(--bg); padding:1rem; border-radius:6px;">
                             <div style="color:var(--text2); font-size:0.85rem;">VSMETA状态</div>
-                            <div>${data.hasVsmeta ? '<span class=\"badge success\">✅ 存在</span>' : '<span class=\"badge warning\">⏳ 待转换</span>'}</div>
+                            <div>${data.hasVsmeta ? '<span class="badge success">✅ 已生成</span>' : '<span class="badge warning">⏳ 待生成</span>'}</div>
                         </div>
                     </div>
                     ${data.metadata ? `
@@ -538,11 +546,9 @@ INDEX_HTML = '''
                     ` : ''}
                 `;
                 
-                // 显示NFO内容
                 document.getElementById('nfo-content').textContent = data.nfoContent || '无NFO内容';
                 document.getElementById('compare-nfo').textContent = data.nfoContent || '无NFO内容';
                 
-                // 显示VSMETA内容
                 document.getElementById('vsmeta-content').textContent = data.vsmetaContent || '无VSMETA内容';
                 document.getElementById('compare-vsmeta').textContent = data.vsmetaContent || '无VSMETA内容';
                 
@@ -562,7 +568,7 @@ INDEX_HTML = '''
                 
                 const pct = p.total > 0 ? Math.round((p.completed / p.total) * 100) : 0;
                 document.getElementById('progress-fill').style.width = pct + '%';
-                document.getElementById('progress-text').textContent = p.currentFile ? `正在处理: ${p.currentFile} (${p.completed}/${p.total})` : '等待开始...';
+                document.getElementById('progress-text').textContent = p.currentFile ? `正在转换: ${p.currentFile} (${p.completed}/${p.total})` : '等待开始...';
                 
                 document.getElementById('btn-start').style.display = data.is_running ? 'none' : 'inline-block';
                 document.getElementById('btn-stop').style.display = data.is_running ? 'inline-block' : 'none';
@@ -578,7 +584,6 @@ INDEX_HTML = '''
                     workers: parseInt(document.getElementById('workers').value),
                     overwrite: document.getElementById('overwrite').checked
                 });
-                _addLog('info', '转换任务已启动');
             } catch (e) {
                 console.error(e);
             }
@@ -587,7 +592,6 @@ INDEX_HTML = '''
         async function stopConversion() {
             try {
                 await api('/api/convert/stop', 'POST');
-                _addLog('info', '停止信号已发送');
             } catch (e) {
                 console.error(e);
             }
@@ -634,26 +638,10 @@ INDEX_HTML = '''
         
         // 定期刷新
         setInterval(refreshStats, 2000);
+        setInterval(refreshLogs, 3000);
         
         // 初始化数据
         refreshStats();
-        
-        // 页面加载后自动扫描
-        setTimeout(refreshFiles, 500);
-        
-        // 简单的本地日志
-        function _addLog(level, msg) {
-            const logEntry = { time: new Date().toLocaleTimeString(), level, message: msg };
-            _state["logs"].push(logEntry);
-        }
-        
-        let _state = { logs: [] };
-        
-        // 确保点击事件绑定正确
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('页面加载完成，事件已绑定');
-        });
-        
     </script>
 </body>
 </html>
@@ -707,7 +695,7 @@ def api_convert_start():
     _state['progress']['failed'] = 0
     _state['progress']['current_file'] = ''
     
-    threading.Thread(target=run_conversion_demo, daemon=True).start()
+    threading.Thread(target=run_real_conversion, daemon=True).start()
     return jsonify({'success': True})
 
 
@@ -718,37 +706,98 @@ def api_convert_stop():
     return jsonify({'success': True})
 
 
-def run_conversion_demo():
-    total = len(_state['scan_results'])
-    _state['progress']['total'] = total
-    
-    for idx in range(total):
-        if not _state['is_running']:
-            break
+def run_real_conversion():
+    """真正调用转换器，生成VSMETA文件"""
+    try:
+        from nfo_to_vsmeta_converter_complete import NFOToVSMETAConverter, Config
         
-        file = _state['scan_results'][idx] if idx < len(_state['scan_results']) else {}
-        _state['progress']['current_file'] = file.get('name', f'file_{idx}')
-        _state['progress']['completed'] = idx + 1
-        _state['progress']['success'] = idx + 1
+        _add_log('info', '正在初始化转换器...')
         
-        _add_log('info', f'正在处理: {file.get("name", f"file_{idx}")}')
-        time.sleep(0.5)
-    
-    _state['is_running'] = False
-    _state['progress']['current_file'] = ''
-    _add_log('success', '转换任务完成！')
+        # 创建配置
+        config = Config()
+        config.directory = _state['scan_results'][0]['dir'] if _state['scan_results'] else '/workspace/test_movies'
+        config.max_workers = 4
+        config.overwrite_existing = True
+        config.enable_backup = True
+        
+        # 创建转换器
+        converter = NFOToVSMETAConverter(config)
+        _add_log('success', '转换器初始化成功')
+        
+        total = len(_state['scan_results'])
+        _state['progress']['total'] = total
+        
+        for idx, file_info in enumerate(_state['scan_results']):
+            if not _state['is_running']:
+                _add_log('warning', '转换任务被用户停止')
+                break
+            
+            filepath = file_info['path']
+            directory = file_info['dir']
+            filename = file_info['name']
+            
+            _state['progress']['current_file'] = filename
+            _state['progress']['completed'] = idx + 1
+            
+            _add_log('info', f'正在转换: {filename}')
+            
+            # 检查是否有NFO文件
+            base = filepath.rsplit('.', 1)[0]
+            nfo_path = base + '.nfo'
+            
+            if not os.path.exists(nfo_path):
+                _state['progress']['failed'] += 1
+                _add_log('warning', f'⏭️ 跳过: {filename} (无NFO文件)')
+                continue
+            
+            try:
+                # 调用真正的转换函数
+                result = converter._process_single_file(directory, filename)
+                
+                if result.get('success'):
+                    _state['progress']['success'] += 1
+                    _add_log('success', f'✅ 转换成功: {filename}')
+                    
+                    # 更新文件状态
+                    _state['scan_results'][idx]['hasVsmeta'] = True
+                    _state['scan_results'][idx]['statusClass'] = 'success'
+                    _state['scan_results'][idx]['statusText'] = '已转换'
+                else:
+                    _state['progress']['failed'] += 1
+                    error_msg = result.get('error', '未知错误')
+                    _add_log('error', f'❌ 转换失败: {filename} - {error_msg}')
+                    
+            except Exception as e:
+                _state['progress']['failed'] += 1
+                _add_log('error', f'❌ 处理异常: {filename} - {str(e)}')
+        
+        _state['is_running'] = False
+        _state['progress']['current_file'] = ''
+        
+        success_count = _state['progress']['success']
+        fail_count = _state['progress']['failed']
+        _add_log('success', f'🎉 转换完成！成功: {success_count}, 失败: {fail_count}')
+        
+    except ImportError as e:
+        _state['is_running'] = False
+        _add_log('error', f'❌ 无法导入转换器: {str(e)}')
+        _add_log('error', '请确保 nfo_to_vsmeta_converter_complete.py 文件存在')
+    except Exception as e:
+        _state['is_running'] = False
+        _add_log('error', f'❌ 转换器错误: {str(e)}')
 
 
 def scan_directory(directory):
     results = []
     if not os.path.exists(directory):
+        _add_log('warning', f'目录不存在: {directory}')
         return results
     
     try:
         for root, dirs, files in os.walk(directory):
             for filename in files:
                 ext = os.path.splitext(filename)[1].lower()
-                if ext in ['.mp4', '.mkv', '.avi', '.ts', '.mov']:
+                if ext in ['.mp4', '.mkv', '.avi', '.ts', '.mov', '.m4v', '.wmv']:
                     filepath = os.path.join(root, filename)
                     base = os.path.splitext(filepath)[0]
                     has_nfo = os.path.exists(base + '.nfo')
@@ -774,7 +823,7 @@ def scan_directory(directory):
                         'statusText': status_text
                     })
     except Exception as e:
-        print(f'Scan error: {e}')
+        _add_log('error', f'扫描目录失败: {e}')
     
     return results
 
@@ -800,7 +849,7 @@ def get_file_detail(filepath):
                 try:
                     vsmeta_content = raw.decode('utf-8', errors='replace')
                 except Exception:
-                    vsmeta_content = f'[Binary file, {len(raw)} bytes]'
+                    vsmeta_content = f'[二进制文件, {len(raw)} bytes]'
         except Exception as e:
             vsmeta_content = f'无法读取: {e}'
     
@@ -859,7 +908,7 @@ def main():
     
     print(f'''
 ╔══════════════════════════════════════════╗
-║   NFO → VSMETA - 稳定增强版          ║
+║   NFO → VSMETA (真正转换版)        ║
 ╠══════════════════════════════════════════╣
 ║   访问地址: http://localhost:{args.port:<5}    ║
 ╚══════════════════════════════════════════╝
