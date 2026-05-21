@@ -6,6 +6,8 @@
 """
 
 from datetime import datetime
+from enum import Enum
+from typing import List, Optional
 
 try:
     from PyQt6.QtWidgets import (
@@ -17,9 +19,11 @@ try:
     PYQT6_AVAILABLE = True
 except ImportError:
     PYQT6_AVAILABLE = False
+    QWidget = object
+    pyqtSignal = lambda *args: None
 
 
-class LogLevel:
+class LogLevel(Enum):
     """日志级别"""
     DEBUG = "DEBUG"
     INFO = "INFO"
@@ -28,241 +32,133 @@ class LogLevel:
     SUCCESS = "SUCCESS"
 
 
-class EnhancedLogWidget(QWidget):
-    """增强的日志组件"""
-    
-    # 自定义信号
-    log_cleared = pyqtSignal()
-    log_exported = pyqtSignal(str)
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._logs = []
-        self._auto_scroll = True
-        self._current_filter = "ALL"
-        self._search_text = ""
-        self.init_ui()
+if PYQT6_AVAILABLE:
+    class EnhancedLogWidget(QWidget):
+        """增强的日志组件"""
         
-    def init_ui(self):
-        """初始化UI"""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
+        # 自定义信号
+        log_cleared = pyqtSignal()
+        log_exported = pyqtSignal(str)
         
-        # 顶部工具栏
-        toolbar_layout = QHBoxLayout()
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self._logs = []
+            self._setup_ui()
         
-        # 过滤器
-        filter_label = QLabel("过滤:")
-        toolbar_layout.addWidget(filter_label)
+        def _setup_ui(self):
+            """设置UI"""
+            layout = QVBoxLayout(self)
+            
+            # 工具栏
+            toolbar = QHBoxLayout()
+            
+            # 日志级别过滤
+            self.level_combo = QComboBox()
+            self.level_combo.addItems(["全部", "DEBUG", "INFO", "WARNING", "ERROR", "SUCCESS"])
+            self.level_combo.currentTextChanged.connect(self._filter_logs)
+            toolbar.addWidget(QLabel("级别:"))
+            toolbar.addWidget(self.level_combo)
+            
+            # 搜索框
+            self.search_input = QLineEdit()
+            self.search_input.setPlaceholderText("搜索日志...")
+            self.search_input.textChanged.connect(self._filter_logs)
+            toolbar.addWidget(self.search_input)
+            
+            # 导出按钮
+            self.export_btn = QPushButton("导出日志")
+            self.export_btn.clicked.connect(self._export_logs)
+            toolbar.addWidget(self.export_btn)
+            
+            # 清除按钮
+            self.clear_btn = QPushButton("清空")
+            self.clear_btn.clicked.connect(self.clear)
+            toolbar.addWidget(self.clear_btn)
+            
+            layout.addLayout(toolbar)
+            
+            # 日志文本框
+            self.log_text = QTextEdit()
+            self.log_text.setReadOnly(True)
+            self.log_text.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+            layout.addWidget(self.log_text)
         
-        self.filter_combo = QComboBox()
-        self.filter_combo.addItems(["全部", "DEBUG", "INFO", "WARNING", "ERROR", "SUCCESS"])
-        self.filter_combo.currentTextChanged.connect(self._on_filter_changed)
-        toolbar_layout.addWidget(self.filter_combo)
+        def _format_log(self, level: str, message: str) -> str:
+            """格式化日志"""
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            return f"[{timestamp}] [{level}] {message}"
         
-        toolbar_layout.addSpacing(16)
+        def _get_color_for_level(self, level: str) -> QColor:
+            """获取日志级别的颜色"""
+            colors = {
+                "DEBUG": QColor(128, 128, 128),
+                "INFO": QColor(0, 0, 0),
+                "WARNING": QColor(255, 165, 0),
+                "ERROR": QColor(255, 0, 0),
+                "SUCCESS": QColor(0, 128, 0)
+            }
+            return colors.get(level, QColor(0, 0, 0))
         
-        # 搜索框
-        search_label = QLabel("搜索:")
-        toolbar_layout.addWidget(search_label)
+        def add_log(self, level: LogLevel, message: str):
+            """添加日志"""
+            self._logs.append({"level": level.value, "message": message})
+            self._update_display()
         
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("搜索日志内容...")
-        self.search_input.textChanged.connect(self._on_search_changed)
-        toolbar_layout.addWidget(self.search_input)
+        def _filter_logs(self):
+            """过滤日志"""
+            self._update_display()
         
-        toolbar_layout.addStretch()
-        
-        # 按钮
-        self.clear_btn = QPushButton("🗑️ 清空")
-        self.clear_btn.clicked.connect(self._on_clear)
-        toolbar_layout.addWidget(self.clear_btn)
-        
-        self.export_btn = QPushButton("📤 导出")
-        self.export_btn.clicked.connect(self._on_export)
-        toolbar_layout.addWidget(self.export_btn)
-        
-        self.auto_scroll_check = QCheckBox("自动滚动")
-        self.auto_scroll_check.setChecked(True)
-        self.auto_scroll_check.stateChanged.connect(self._on_auto_scroll_changed)
-        toolbar_layout.addWidget(self.auto_scroll_check)
-        
-        layout.addLayout(toolbar_layout)
-        
-        # 统计信息栏
-        stats_layout = QHBoxLayout()
-        
-        self.stats_label = QLabel("日志: 0 | DEBUG: 0 | INFO: 0 | WARNING: 0 | ERROR: 0 | SUCCESS: 0")
-        stats_layout.addWidget(self.stats_label)
-        
-        stats_layout.addStretch()
-        
-        layout.addLayout(stats_layout)
-        
-        # 日志文本框
-        self.log_text = QTextEdit()
-        self.log_text.setReadOnly(True)
-        self.log_text.setFont(QFont("Consolas", 10))
-        layout.addWidget(self.log_text)
-        
-    def log(self, message: str, level: str = LogLevel.INFO):
-        """添加日志"""
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        log_entry = {
-            'timestamp': timestamp,
-            'message': message,
-            'level': level
-        }
-        self._logs.append(log_entry)
-        self._append_log_entry(log_entry)
-        self._update_stats()
-        
-    def debug(self, message: str):
-        """DEBUG级别日志"""
-        self.log(f"🔍 {message}", LogLevel.DEBUG)
-    
-    def info(self, message: str):
-        """INFO级别日志"""
-        self.log(f"ℹ️ {message}", LogLevel.INFO)
-    
-    def warning(self, message: str):
-        """WARNING级别日志"""
-        self.log(f"⚠️ {message}", LogLevel.WARNING)
-    
-    def error(self, message: str):
-        """ERROR级别日志"""
-        self.log(f"❌ {message}", LogLevel.ERROR)
-    
-    def success(self, message: str):
-        """SUCCESS级别日志"""
-        self.log(f"✅ {message}", LogLevel.SUCCESS)
-    
-    def _get_level_color(self, level: str) -> QColor:
-        """获取日志级别颜色"""
-        color_map = {
-            LogLevel.DEBUG: QColor("#9b59b6"),
-            LogLevel.INFO: QColor("#3498db"),
-            LogLevel.WARNING: QColor("#f39c12"),
-            LogLevel.ERROR: QColor("#e74c3c"),
-            LogLevel.SUCCESS: QColor("#2ecc71")
-        }
-        return color_map.get(level, QColor("#333333"))
-    
-    def _append_log_entry(self, log_entry: dict):
-        """添加单个日志条目"""
-        # 检查过滤
-        if self._current_filter != "ALL" and self._current_filter != "全部":
-            if log_entry['level'] != self._current_filter:
-                return
-        
-        # 检查搜索
-        if self._search_text:
-            if self._search_text.lower() not in log_entry['message'].lower():
-                return
-        
-        cursor = self.log_text.textCursor()
-        cursor.movePosition(QTextCursor.MoveOperation.End)
-        
-        # 时间戳格式
-        timestamp_format = QTextCharFormat()
-        timestamp_format.setForeground(QColor("#888888"))
-        
-        # 消息格式
-        message_format = QTextCharFormat()
-        message_format.setForeground(self._get_level_color(log_entry['level']))
-        
-        cursor.setCharFormat(timestamp_format)
-        cursor.insertText(f"[{log_entry['timestamp']}] ")
-        
-        cursor.setCharFormat(message_format)
-        cursor.insertText(f"{log_entry['message']}\n")
-        
-        if self._auto_scroll:
-            self.log_text.setTextCursor(cursor)
-            self.log_text.ensureCursorVisible()
-    
-    def _refresh_display(self):
-        """刷新显示"""
-        self.log_text.clear()
-        for log_entry in self._logs:
-            self._append_log_entry(log_entry)
-    
-    def _update_stats(self):
-        """更新统计信息"""
-        stats = {
-            'total': len(self._logs),
-            'DEBUG': 0,
-            'INFO': 0,
-            'WARNING': 0,
-            'ERROR': 0,
-            'SUCCESS': 0
-        }
-        
-        for log_entry in self._logs:
-            stats[log_entry['level']] = stats.get(log_entry['level'], 0) + 1
-        
-        self.stats_label.setText(
-            f"日志: {stats['total']} | "
-            f"DEBUG: {stats['DEBUG']} | "
-            f"INFO: {stats['INFO']} | "
-            f"WARNING: {stats['WARNING']} | "
-            f"ERROR: {stats['ERROR']} | "
-            f"SUCCESS: {stats['SUCCESS']}"
-        )
-    
-    def _on_filter_changed(self, text: str):
-        """过滤器变化"""
-        filter_map = {
-            "全部": "ALL",
-            "DEBUG": "DEBUG",
-            "INFO": "INFO",
-            "WARNING": "WARNING",
-            "ERROR": "ERROR",
-            "SUCCESS": "SUCCESS"
-        }
-        self._current_filter = filter_map.get(text, "ALL")
-        self._refresh_display()
-    
-    def _on_search_changed(self, text: str):
-        """搜索文本变化"""
-        self._search_text = text
-        self._refresh_display()
-    
-    def _on_auto_scroll_changed(self, state: int):
-        """自动滚动变化"""
-        self._auto_scroll = (state == Qt.CheckState.Checked.value)
-    
-    def _on_clear(self):
-        """清空日志"""
-        self._logs = []
-        self.log_text.clear()
-        self._update_stats()
-        self.log_cleared.emit()
-    
-    def _on_export(self):
-        """导出日志"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        default_name = f"nfo_converter_log_{timestamp}.txt"
-        
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "导出日志",
-            default_name,
-            "文本文件 (*.txt);;所有文件 (*.*)"
-        )
-        
-        if file_path:
-            try:
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    for log_entry in self._logs:
-                        f.write(f"[{log_entry['timestamp']}] [{log_entry['level']}] {log_entry['message']}\n")
+        def _update_display(self):
+            """更新显示"""
+            level_filter = self.level_combo.currentText()
+            search_text = self.search_input.text().lower()
+            
+            cursor = self.log_text.textCursor()
+            cursor.movePosition(QTextCursor.Start)
+            
+            self.log_text.clear()
+            
+            for log in self._logs:
+                level = log["level"]
+                message = log["message"]
                 
-                self.success(f"日志已导出到: {file_path}")
-                self.log_exported.emit(file_path)
-            except Exception as e:
-                self.error(f"导出失败: {str(e)}")
-    
-    def get_all_logs(self) -> list:
-        """获取所有日志"""
-        return self._logs.copy()
+                # 应用过滤
+                if level_filter != "全部" and level != level_filter:
+                    continue
+                if search_text and search_text not in message.lower():
+                    continue
+                
+                # 格式化
+                text = self._format_log(level, message) + "\n"
+                
+                # 设置颜色
+                char_format = QTextCharFormat()
+                char_format.setForeground(self._get_color_for_level(level))
+                
+                cursor.insertText(text, char_format)
+        
+        def clear(self):
+            """清空日志"""
+            self._logs.clear()
+            self.log_text.clear()
+            self.log_cleared.emit()
+        
+        def _export_logs(self):
+            """导出日志"""
+            filename, _ = QFileDialog.getSaveFileName(
+                self, "导出日志", "", "文本文件 (*.txt);;所有文件 (*)"
+            )
+            if filename:
+                with open(filename, "w", encoding="utf-8") as f:
+                    for log in self._logs:
+                        f.write(self._format_log(log["level"], log["message"]) + "\n")
+                self.log_exported.emit(filename)
+        
+        def get_logs(self) -> List[dict]:
+            """获取所有日志"""
+            return self._logs.copy()
+else:
+    class EnhancedLogWidget:
+        """PyQt6不可用时的空实现"""
+        def __init__(self, *args, **kwargs):
+            raise ImportError("PyQt6 is not available")

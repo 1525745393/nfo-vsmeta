@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
     print("👋 服务器关闭中...")
 
 
-def create_app(config: ServerConfig = None) -&gt; FastAPI:
+def create_app(config: ServerConfig = None) -> FastAPI:
     if config is None:
         config = ServerConfig()
     app = FastAPI(
