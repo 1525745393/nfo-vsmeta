@@ -914,6 +914,12 @@ INDEX_HTML = """
         }
         
         function toggleNode(element, level) {
+            const folderSpan = element.parentElement.querySelector('[data-path]');
+            if (folderSpan) {
+                const path = decodeURIComponent(folderSpan.dataset.path);
+                // 更新数据结构
+                updateNodeExpanded(fileTree, path);
+            }
             const childrenDiv = element.parentElement.querySelector('.tree-children');
             if (childrenDiv) {
                 const isCollapsed = childrenDiv.classList.contains('collapsed');
@@ -922,7 +928,27 @@ INDEX_HTML = """
                 if (toggle) {
                     toggle.textContent = isCollapsed ? '▼' : '▶';
                 }
+                const folderIcon = element.parentElement.querySelector('.tree-folder');
+                if (folderIcon) {
+                    folderIcon.textContent = isCollapsed ? '📂' : '📁';
+                }
             }
+        }
+        
+        function updateNodeExpanded(nodes, targetPath) {
+            for (let i = 0; i < nodes.length; i++) {
+                const node = nodes[i];
+                if (node.type === 'folder') {
+                    if (node.path === targetPath) {
+                        node.expanded = !node.expanded;
+                        return true;
+                    }
+                    if (node.children && updateNodeExpanded(node.children, targetPath)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
         
         function goToParentDir() {
@@ -1288,13 +1314,13 @@ def build_tree(directory):
     """构建目录树"""
     tree = []
     if not os.path.exists(directory):
-        _add_log('warning', f'目录未找到: {directory}')
+        _add_log('warning', '目录未找到: ' + directory)
         return tree
     
     try:
         items = sorted(os.listdir(directory))
         
-        # 先处理文件夹
+        # 先处理文件夹 - 显示所有文件夹，方便导航
         folders = []
         for item in items:
             item_path = os.path.join(directory, item)
@@ -1306,9 +1332,7 @@ def build_tree(directory):
                     'children': build_tree(item_path),
                     'expanded': False
                 }
-                # 只有包含文件的文件夹才显示
-                if count_files_in_tree(folder_node) > 0:
-                    folders.append(folder_node)
+                folders.append(folder_node)
         
         # 再处理视频文件
         for item in items:
@@ -1343,7 +1367,7 @@ def build_tree(directory):
         # 合并文件夹和文件
         tree = folders + tree
     except Exception as e:
-        _add_log('error', f'扫描失败: {e}')
+        _add_log('error', '扫描失败: ' + str(e))
     
     return tree
 
