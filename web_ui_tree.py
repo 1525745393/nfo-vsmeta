@@ -559,6 +559,17 @@ INDEX_HTML = """
                 </div>
                 
                 <input type="text" id="scan-dir" value="/workspace/test_movies" placeholder="输入目录路径">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
+                    <button class="btn btn-secondary" style="font-size: 13px; padding: 6px 12px;" onclick="document.getElementById('scan-dir').value='/workspace/test_movies'; refreshFiles();">
+                        📁 测试文件夹
+                    </button>
+                    <button class="btn btn-secondary" style="font-size: 13px; padding: 6px 12px;" onclick="document.getElementById('scan-dir').value='/workspace'; refreshFiles();">
+                        💼 工作区
+                    </button>
+                    <button class="btn btn-secondary" style="font-size: 13px; padding: 6px 12px;" onclick="document.getElementById('scan-dir').value='/'; refreshFiles();">
+                        🏠 根目录
+                    </button>
+                </div>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     <button class="btn btn-primary" onclick="refreshFiles();">🔄 扫描文件</button>
                     <button class="btn btn-secondary" onclick="expandAll();">⬇️ 展开全部</button>
@@ -829,7 +840,7 @@ INDEX_HTML = """
                     html += '<span class="tree-toggle" onclick="toggleNode(this, ' + level + ')">' + 
                             (node.expanded ? '▼' : '▶') + '</span>';
                     html += '<span class="tree-icon tree-folder">📁</span>';
-                    html += '<span onclick="toggleNode(this, ' + level + '); selectFolder(this);">' + node.name + '</span>';
+                    html += '<span data-path="' + encodeURIComponent(node.path) + '" onclick="selectFolder(this);" style="cursor: pointer;">' + node.name + '</span>';
                     
                     if (node.children && node.children.length > 0) {
                         html += '<div class="tree-children' + (node.expanded ? '' : ' collapsed') + '">';
@@ -863,7 +874,9 @@ INDEX_HTML = """
         }
         
         function selectFolder(element) {
-            // 文件夹点击可以展开/折叠
+            const path = decodeURIComponent(element.dataset.path);
+            document.getElementById('scan-dir').value = path;
+            alert('已选择文件夹: ' + path + '\n点击「扫描文件」按钮以加载该目录');
         }
         
         function selectFileByPath(path) {
