@@ -634,20 +634,46 @@ INDEX_HTML = """
                 <h2>⚙️ 转换设置</h2>
                 <input type="text" id="convert-dir" value="/workspace/test_movies" placeholder="目录路径">
                 
-                <div class="detail-grid">
+                <div class="detail-grid" style="margin-top: 15px;">
                     <div class="detail-item">
                         <div class="detail-label">⚡ 工作线程数</div>
-                        <input type="number" id="workers" value="4" min="1" max="16">
+                        <input type="number" id="workers" value="4" min="1" max="16" style="width: 100%;">
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">🔄 重试次数</div>
+                        <input type="number" id="retry-attempts" value="3" min="0" max="10" style="width: 100%;">
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">⏱️ 重试延迟(秒)</div>
+                        <input type="number" id="retry-delay" value="1" min="0" max="10" style="width: 100%;">
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">🖼️ 图片压缩(KB)</div>
+                        <input type="number" id="max-image-size" value="500" min="100" max="5000" step="100" style="width: 100%;">
                     </div>
                 </div>
                 
-                <div class="checkbox-group">
-                    <input type="checkbox" id="overwrite">
-                    <label for="overwrite">覆盖已有VSMETA文件</label>
+                <div style="margin-top: 20px;">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="overwrite">
+                        <label for="overwrite">覆盖已有VSMETA文件</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="recursive" checked>
+                        <label for="recursive">递归扫描子目录</label>
+                    </div>
                 </div>
-                <div class="checkbox-group">
-                    <input type="checkbox" id="recursive" checked>
-                    <label for="recursive">递归扫描子目录</label>
+                
+                <div style="margin-top: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border-left: 4px solid var(--primary);">
+                    <div style="font-size: 0.9em; color: var(--text-secondary); line-height: 1.6;">
+                        <strong>💡 使用说明：</strong><br>
+                        • <strong>工作线程数</strong>：并发处理的文件数，建议CPU核心数<br>
+                        • <strong>重试次数</strong>：失败文件自动重试次数，默认3次<br>
+                        • <strong>重试延迟</strong>：重试间隔时间（秒），默认1秒<br>
+                        • <strong>图片压缩</strong>：海报图片最大大小，超过则自动压缩<br>
+                        • <strong>覆盖文件</strong>：重新转换已存在的VSMETA文件<br>
+                        • <strong>递归扫描</strong>：扫描所有子目录中的视频文件
+                    </div>
                 </div>
                 
                 <div style="margin-top: 20px;">
@@ -1127,18 +1153,28 @@ INDEX_HTML = """
                 return;
             }
             
+            const config = {
+                dir: dir,
+                workers: parseInt(document.getElementById('workers').value) || 4,
+                retryAttempts: parseInt(document.getElementById('retry-attempts').value) || 3,
+                retryDelay: parseInt(document.getElementById('retry-delay').value) || 1,
+                maxImageSize: parseInt(document.getElementById('max-image-size').value) || 500,
+                overwrite: document.getElementById('overwrite').checked,
+                recursive: document.getElementById('recursive').checked
+            };
+            
             if (confirm('确定要开始转换吗？')) {
                 try {
                     const response = await fetch('/api/convert/start', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({dir: dir})
+                        body: JSON.stringify(config)
                     });
                     
                     const result = await response.json();
                     
                     if (result.success) {
-                        alert('✓ 转换任务已启动！');
+                        alert('✓ 转换任务已启动！请查看转换进度。');
                         loadConversionStatus();
                     } else {
                         alert('✗ 启动转换失败：' + (result.error || '未知错误'));
@@ -1355,6 +1391,12 @@ def api_convert_start():
     
     data = request.get_json(silent=True) or {}
     directory = data.get('dir', '/workspace/test_movies')
+    workers = data.get('workers', 4)
+    retry_attempts = data.get('retryAttempts', 3)
+    retry_delay = data.get('retryDelay', 1)
+    max_image_size = data.get('maxImageSize', 500)
+    overwrite = data.get('overwrite', False)
+    recursive = data.get('recursive', True)
     
     _state['is_running'] = True
     _state['progress']['completed'] = 0
@@ -1362,7 +1404,11 @@ def api_convert_start():
     _state['progress']['failed'] = 0
     _state['progress']['current_file'] = ''
     
-    threading.Thread(target=run_conversion_cli, args=(directory,), daemon=True).start()
+    threading.Thread(
+        target=run_conversion_cli, 
+        args=(directory, workers, retry_attempts, retry_delay, max_image_size, overwrite, recursive),
+        daemon=True
+    ).start()
     return jsonify({'success': True})
 
 
@@ -1373,7 +1419,7 @@ def api_convert_stop():
     return jsonify({'success': True})
 
 
-def run_conversion_cli(directory):
+def run_conversion_cli(directory, workers=4, retry_attempts=3, retry_delay=1, max_image_size=500, overwrite=False, recursive=True):
     try:
         cmd = [
             sys.executable,
@@ -1385,7 +1431,12 @@ from nfo_to_vsmeta_converter_complete import NFOToVSMETAConverter, Config
 
 config = Config()
 config.directory = "''' + directory + '''"
-config.max_workers = 4
+config.max_workers = ''' + str(workers) + '''
+config.retry_attempts = ''' + str(retry_attempts) + '''
+config.retry_delay = ''' + str(retry_delay) + '''
+config.max_image_size_kb = ''' + str(max_image_size) + '''
+config.overwrite = ''' + str(overwrite).lower() + '''
+config.recursive = ''' + str(recursive).lower() + '''
 
 converter = NFOToVSMETAConverter(config)
 files = converter.file_scanner.scan()
@@ -1402,7 +1453,7 @@ for dirname, filename in files:
 '''
         ]
         
-        _add_log('info', '开始转换...')
+        _add_log('info', '开始转换（线程: ' + str(workers) + ', 重试: ' + str(retry_attempts) + '次）...')
         
         process = subprocess.Popen(
             cmd,
@@ -1429,10 +1480,10 @@ for dirname, filename in files:
         files = scan_directory(directory)
         _state['scan_results'] = files
         
-        _add_log('success', f'转换完成！成功: {_state["progress"]["success"]}, 失败: {_state["progress"]["failed"]}')
+        _add_log('success', '转换完成！成功: ' + str(_state['progress']['success']) + ', 失败: ' + str(_state['progress']['failed']))
         
     except Exception as e:
-        _add_log('error', f'转换失败: {str(e)}')
+        _add_log('error', '转换失败: ' + str(e))
     finally:
         _state['is_running'] = False
         _state['progress']['current_file'] = ''
