@@ -1005,7 +1005,7 @@ INDEX_HTML = """
                 return;
             }
             
-            if (confirm('确定要开始转换吗？\n将转换 ' + pendingFiles.length + ' 个文件。')) {
+            if (confirm('确定要开始转换吗？将转换 ' + pendingFiles.length + ' 个文件。')) {
                 try {
                     const response = await fetch('/api/convert/start', {
                         method: 'POST',
@@ -1018,7 +1018,7 @@ INDEX_HTML = """
                     const result = await response.json();
                     
                     if (result.success) {
-                        alert('✓ 转换任务已启动！\n请查看「转换」页面监控进度。');
+                        alert('✓ 转换任务已启动！请查看「转换」页面监控进度。');
                         showPage('convert');
                         loadConversionStatus();
                     } else {
