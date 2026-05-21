@@ -603,6 +603,71 @@ INDEX_HTML = '''
         ::-webkit-scrollbar-thumb:hover {
             background: var(--border-light);
         }
+        
+        /* 工作流步骤 */
+        .workflow-step {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg3);
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .workflow-step.active {
+            background: rgba(74, 158, 255, 0.1);
+            border-color: var(--accent);
+            box-shadow: var(--shadow-glow);
+        }
+        
+        .workflow-step.completed {
+            background: rgba(74, 222, 128, 0.1);
+            border-color: var(--success);
+        }
+        
+        .step-number {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--gradient-primary);
+            color: white;
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+        
+        .workflow-step.completed .step-number {
+            background: var(--gradient-success);
+        }
+        
+        .step-text {
+            font-weight: 500;
+            color: var(--text);
+        }
+        
+        .workflow-arrow {
+            color: var(--text3);
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+        
+        /* 快捷操作按钮 */
+        .card button {
+            width: 100%;
+            height: 48px;
+            font-size: 0.95rem;
+        }
+        
+        /* 导出按钮 */
+        button.btn-success {
+            background: var(--gradient-success);
+            color: white;
+            border: none;
+        }
     </style>
 </head>
 <body>
@@ -619,54 +684,139 @@ INDEX_HTML = '''
     </div>
     
     <div class="page active" id="page-dashboard">
-        <h2 style="margin-bottom: 1rem;">状态</h2>
-        <div class="grid">
-            <div class="card">
-                <div class="stat-label">总文件数</div>
-                <div class="stat-value" id="stat-total">0</div>
-            </div>
-            <div class="card">
-                <div class="stat-label">已转换</div>
-                <div class="stat-value" style="color: var(--success);" id="stat-success">0</div>
-            </div>
-            <div class="card">
-                <div class="stat-label">待转换</div>
-                <div class="stat-value" style="color: var(--warning);" id="stat-pending">0</div>
-            </div>
-            <div class="card">
-                <div class="stat-label">失败</div>
-                <div class="stat-value" style="color: var(--danger);" id="stat-failed">0</div>
+        <h2 style="margin-bottom: 1.5rem;">📊 控制面板</h2>
+        
+        <!-- 工作流引导 -->
+        <div class="card" style="margin-bottom: 2rem;">
+            <h3 style="margin-bottom: 1rem;">🚀 快速开始</h3>
+            <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                <div class="workflow-step active" id="step-1">
+                    <div class="step-number">1</div>
+                    <div class="step-text">选择目录</div>
+                </div>
+                <div class="workflow-arrow">→</div>
+                <div class="workflow-step" id="step-2">
+                    <div class="step-number">2</div>
+                    <div class="step-text">扫描文件</div>
+                </div>
+                <div class="workflow-arrow">→</div>
+                <div class="workflow-step" id="step-3">
+                    <div class="step-number">3</div>
+                    <div class="step-text">开始转换</div>
+                </div>
+                <div class="workflow-arrow">→</div>
+                <div class="workflow-step" id="step-4">
+                    <div class="step-number">4</div>
+                    <div class="step-text">完成</div>
+                </div>
             </div>
         </div>
+        
+        <!-- 统计卡片 -->
+        <div class="grid">
+            <div class="card success">
+                <div class="stat-label">✅ 已转换</div>
+                <div class="stat-value" id="stat-success">0</div>
+            </div>
+            <div class="card warning">
+                <div class="stat-label">⏳ 待转换</div>
+                <div class="stat-value" id="stat-pending">0</div>
+            </div>
+            <div class="card danger">
+                <div class="stat-label">❌ 失败</div>
+                <div class="stat-value" id="stat-failed">0</div>
+            </div>
+            <div class="card">
+                <div class="stat-label">📁 总文件数</div>
+                <div class="stat-value" id="stat-total">0</div>
+            </div>
+        </div>
+        
+        <!-- 转换进度 -->
         <div class="card">
-            <h3 style="margin-bottom: 0.5rem;">进度</h3>
-            <div class="progress-bar">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3>📈 转换进度</h3>
+                <div id="progress-percentage" style="font-size: 1.5rem; font-weight: 700; color: var(--accent);">0%</div>
+            </div>
+            <div class="progress-bar" style="height: 40px;">
                 <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
             </div>
-            <div id="progress-text" style="margin-top: 0.75rem; color: var(--text2);">等待中...</div>
+            <div style="display: flex; justify-content: space-between; margin-top: 1rem; color: var(--text2);">
+                <div id="progress-text">等待中...</div>
+                <div id="progress-detail">0 / 0 文件</div>
+            </div>
+            
+            <!-- 速度指示器 -->
+            <div id="speed-indicator" style="display: none; margin-top: 1rem; padding: 0.75rem; background: var(--bg3); border-radius: 8px;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>⚡ 转换速度</span>
+                    <span id="conversion-speed">0 文件/秒</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;">
+                    <span>⏱️ 预计剩余</span>
+                    <span id="time-remaining">计算中...</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 快捷操作 -->
+        <div class="card" style="margin-top: 1.5rem;">
+            <h3 style="margin-bottom: 1rem;">⚡ 快捷操作</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                <button class="btn btn-primary" onclick="showPage('files'); refreshFiles();">
+                    📁 扫描文件
+                </button>
+                <button class="btn btn-primary" onclick="showPage('convert'); startConversion();">
+                    ▶️ 开始转换
+                </button>
+                <button class="btn" onclick="showPage('logs'); refreshLogs();">
+                    📋 查看日志
+                </button>
+                <button class="btn" onclick="toggleTheme()">
+                    🌙 切换主题
+                </button>
+            </div>
         </div>
     </div>
     
     <div class="page" id="page-files">
-        <h2 style="margin-bottom: 1rem;">文件</h2>
-        <div style="margin-bottom: 1rem;">
-            <label style="color: var(--text2);">目录</label>
-            <input type="text" class="input" id="config-dir" value="/workspace/test_movies" placeholder="/path/to/movies">
-            <div style="margin-top: 1rem;">
-                <button class="btn btn-primary" onclick="refreshFiles()">🔄 扫描文件</button>
+        <h2 style="margin-bottom: 1.5rem;">📁 文件管理</h2>
+        
+        <!-- 搜索和过滤 -->
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem; align-items: end;">
+                <div>
+                    <label style="color: var(--text2); font-size: 0.9rem;">📂 目录路径</label>
+                    <input type="text" class="input" id="config-dir" value="/workspace/test_movies" placeholder="/path/to/movies">
+                </div>
+                <div>
+                    <label style="color: var(--text2); font-size: 0.9rem;">🔍 状态过滤</label>
+                    <select class="input" id="filter-status" onchange="filterFiles()">
+                        <option value="all">全部</option>
+                        <option value="converted">已转换</option>
+                        <option value="pending">待转换</option>
+                        <option value="no-nfo">无NFO</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="refreshFiles()" style="height: fit-content;">
+                    🔄 扫描
+                </button>
             </div>
         </div>
         
         <div class="two-col">
             <div>
-                <h3 style="margin-bottom: 0.75rem;">文件列表</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <h3>📋 文件列表</h3>
+                    <div id="file-count" style="color: var(--text2); font-size: 0.9rem;">0 个文件</div>
+                </div>
                 <div class="tree" id="file-tree">
-                    <div style="color: var(--text2); padding: 1rem; text-align: center;">点击「扫描文件」加载文件</div>
+                    <div style="color: var(--text2); padding: 1rem; text-align: center;">点击「扫描」加载文件</div>
                 </div>
             </div>
             
             <div>
-                <h3 style="margin-bottom: 0.75rem;">文件详情</h3>
+                <h3 style="margin-bottom: 0.75rem;">📋 文件详情</h3>
                 <div class="detail">
                     <div class="detail-tabs">
                         <button class="detail-tab active" onclick="showDetail('overview')">📋 概览</button>
@@ -696,25 +846,25 @@ INDEX_HTML = '''
                     <div class="detail-content" id="detail-compare">
                         <div class="compare">
                             <div>
-                                <h4 style="margin-bottom: 0.5rem;">NFO 内容</h4>
+                                <h4>NFO 内容</h4>
                                 <div id="compare-nfo" class="code">无内容</div>
                             </div>
                             <div>
-                                <h4 style="margin-bottom: 0.5rem;">VSMETA 内容</h4>
+                                <h4>VSMETA 内容</h4>
                                 <div id="compare-vsmeta" class="code">无内容</div>
                             </div>
                         </div>
                     </div>
                     
                     <div class="detail-content" id="detail-poster">
-                        <h4 style="margin-bottom: 0.5rem;">封面图片</h4>
+                        <h4>封面图片</h4>
                         <div class="image-container" id="poster-container">
                             <div class="image-placeholder">请先选择文件</div>
                         </div>
                     </div>
                     
                     <div class="detail-content" id="detail-fanart">
-                        <h4 style="margin-bottom: 0.5rem;">背景图片</h4>
+                        <h4>背景图片</h4>
                         <div class="image-container" id="fanart-container">
                             <div class="image-placeholder">请先选择文件</div>
                         </div>
@@ -725,46 +875,71 @@ INDEX_HTML = '''
     </div>
     
     <div class="page" id="page-convert">
-        <h2 style="margin-bottom: 1rem;">🚀 转换</h2>
+        <h2 style="margin-bottom: 1.5rem;">🚀 批量转换</h2>
         
-        <div class="alert">
-            ⚠️ 此版本使用 subprocess 调用转换器，稳定可靠！
+        <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid var(--accent);">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <span style="font-size: 2rem;">💡</span>
+                <div>
+                    <div style="font-weight: 600; margin-bottom: 0.25rem;">提示</div>
+                    <div style="color: var(--text2); font-size: 0.9rem;">此版本使用 subprocess 调用转换器，稳定可靠！支持批量转换、自动跳过已转换文件。</div>
+                </div>
+            </div>
         </div>
         
         <div class="card">
-            <h3 style="margin-bottom: 1rem;">设置</h3>
-            <div style="margin-bottom: 1rem;">
-                <label style="color: var(--text2);">目录</label>
+            <h3 style="margin-bottom: 1.5rem;">⚙️ 转换设置</h3>
+            
+            <div style="margin-bottom: 1.5rem;">
+                <label style="color: var(--text2); font-size: 0.9rem;">📂 处理目录</label>
                 <input type="text" class="input" id="convert-dir" value="/workspace/test_movies">
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
                 <div>
-                    <label style="color: var(--text2);">工作线程数</label>
-                    <input type="number" class="input" id="workers" value="4">
+                    <label style="color: var(--text2); font-size: 0.9rem;">⚡ 工作线程数</label>
+                    <input type="number" class="input" id="workers" value="4" min="1" max="16">
                 </div>
                 <div>
-                    <label style="color: var(--text2);">选项</label>
+                    <label style="color: var(--text2); font-size: 0.9rem;">📋 选项</label>
                     <div style="margin-top: 0.75rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin-bottom: 0.5rem;">
+                            <input type="checkbox" id="overwrite"> 
+                            <span>覆盖已有 VSMETA</span>
+                        </label>
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" id="overwrite"> 覆盖已有的 VSMETA
+                            <input type="checkbox" id="recursive" checked>
+                            <span>递归扫描子目录</span>
                         </label>
                     </div>
                 </div>
             </div>
-            <div>
-                <button class="btn btn-primary" id="btn-start" onclick="startConversion()">▶️ 开始转换</button>
-                <button class="btn btn-danger" id="btn-stop" onclick="stopConversion()" style="display:none;">⏹️ 停止转换</button>
+            
+            <div style="display: flex; gap: 1rem;">
+                <button class="btn btn-primary" id="btn-start" onclick="startConversion()" style="flex: 1;">
+                    ▶️ 开始转换
+                </button>
+                <button class="btn btn-danger" id="btn-stop" onclick="stopConversion()" style="flex: 1; display: none;">
+                    ⏹️ 停止转换
+                </button>
             </div>
         </div>
     </div>
     
     <div class="page" id="page-logs">
-        <h2 style="margin-bottom: 1rem;">日志</h2>
-        <div style="margin-bottom: 1rem;">
-            <button class="btn" onclick="refreshLogs()">🔄 刷新</button>
-            <button class="btn" onclick="clearLogs()">🗑️ 清空</button>
+        <h2 style="margin-bottom: 1.5rem;">📋 运行日志</h2>
+        <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+            <button class="btn" onclick="refreshLogs()">
+                🔄 刷新
+            </button>
+            <button class="btn" onclick="clearLogs()">
+                🗑️ 清空
+            </button>
+            <button class="btn" onclick="downloadLogs()">
+                📥 导出日志
+            </button>
         </div>
-        <div class="log-box" id="log-box">无日志</div>
+        <div class="log-box" id="log-box">暂无日志</div>
     </div>
     
     <script>
@@ -964,8 +1139,70 @@ INDEX_HTML = '''
             initDragDrop();
             initKeyboardShortcuts();
             initTooltips();
+            updateWorkflowSteps();
             showNotification('快捷键提示：1-4切换页面，T切换主题，Ctrl+Enter开始转换', 'info');
         });
+        
+        // ==================== 工作流指示器 ====================
+        function updateWorkflowSteps() {
+            const dirInput = document.getElementById('config-dir');
+            const step1 = document.getElementById('step-1');
+            const step2 = document.getElementById('step-2');
+            const step3 = document.getElementById('step-3');
+            const step4 = document.getElementById('step-4');
+            
+            if (!dirInput || !step1) return;
+            
+            // 步骤1: 选择目录 - 始终完成
+            step1.classList.add('completed');
+            
+            // 步骤2: 扫描文件
+            if (scanResults.length > 0) {
+                step2.classList.remove('active');
+                step2.classList.add('completed');
+            }
+            
+            // 步骤3: 开始转换
+            if (_state && _state.is_running) {
+                step3.classList.add('active');
+            }
+            
+            // 步骤4: 完成
+            if (_state && !_state.is_running && _state.progress && _state.progress.completed > 0) {
+                step4.classList.add('completed');
+            }
+        }
+        
+        // ==================== 文件过滤 ====================
+        function filterFiles() {
+            const filter = document.getElementById('filter-status')?.value || 'all';
+            renderFileTree(filter);
+        }
+        
+        // ==================== 导出日志 ====================
+        function downloadLogs() {
+            const logBox = document.getElementById('log-box');
+            if (!logBox) return;
+            
+            const logs = Array.from(logBox.querySelectorAll('div')).map(div => div.textContent).join('\n');
+            
+            if (!logs || logs === '暂无日志') {
+                showNotification('没有日志可导出', 'error');
+                return;
+            }
+            
+            const blob = new Blob([logs], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `nfo-converter-logs-${new Date().toISOString().slice(0,10)}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showNotification('日志已导出', 'success');
+        }
         
         async function api(url, method='GET', data=null) {
             try {
@@ -1016,16 +1253,36 @@ INDEX_HTML = '''
             }
         }
         
-        function renderFileTree() {
+        function renderFileTree(filter='all') {
             const container = document.getElementById('file-tree');
+            const fileCount = document.getElementById('file-count');
             
             if (!scanResults.length) {
                 container.innerHTML = '<div style="text-align:center; padding:2rem; color:var(--text2);">未找到视频文件<br><br>支持的格式：.mp4, .mkv, .avi, .ts, .mov</div>';
+                if (fileCount) fileCount.textContent = '0 个文件';
                 return;
             }
             
-            container.innerHTML = scanResults.map((file, idx) => `
-                <div class="tree-item" onclick="selectFile(${idx})" id="file-${idx}">
+            let filtered = scanResults;
+            
+            if (filter !== 'all') {
+                filtered = scanResults.filter(file => {
+                    if (filter === 'converted') return file.statusClass === 'success';
+                    if (filter === 'pending') return file.statusClass === 'warning';
+                    if (filter === 'no-nfo') return file.statusClass === 'danger';
+                    return true;
+                });
+            }
+            
+            if (fileCount) fileCount.textContent = `${filtered.length} 个文件`;
+            
+            if (!filtered.length) {
+                container.innerHTML = '<div style="text-align:center; padding:2rem; color:var(--text2);">没有符合条件的文件</div>';
+                return;
+            }
+            
+            container.innerHTML = filtered.map((file, idx) => `
+                <div class="tree-item" onclick="selectFilteredFile('${file.path}')" id="file-${file.path.replace(/[^a-zA-Z0-9]/g, '_')}">
                     <span>🎬</span>
                     <span style="flex:1;">${file.name}</span>
                     <span class="badge ${file.statusClass}">${file.statusText}</span>
@@ -1033,12 +1290,22 @@ INDEX_HTML = '''
             `).join('');
         }
         
+        function selectFilteredFile(filepath) {
+            const file = scanResults.find(f => f.path === filepath);
+            if (file) {
+                const idx = scanResults.indexOf(file);
+                selectFile(idx);
+            }
+        }
+        
         function selectFile(index) {
             document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('selected'));
-            const el = document.getElementById('file-' + index);
-            if (el) el.classList.add('selected');
-            
             const file = scanResults[index];
+            if (file) {
+                const el = document.getElementById('file-' + file.path.replace(/[^a-zA-Z0-9]/g, '_'));
+                if (el) el.classList.add('selected');
+            }
+            
             renderFileDetail(file);
         }
         
@@ -1118,17 +1385,38 @@ INDEX_HTML = '''
             try {
                 const data = await api('/api/status');
                 const p = data.progress || {};
+                
+                // 更新统计卡片
                 document.getElementById('stat-total').textContent = p.total || 0;
                 document.getElementById('stat-success').textContent = p.success || 0;
                 document.getElementById('stat-pending').textContent = Math.max(0, (p.total || 0) - (p.completed || 0));
                 document.getElementById('stat-failed').textContent = p.failed || 0;
                 
+                // 计算百分比
                 const pct = p.total > 0 ? Math.round((p.completed / p.total) * 100) : 0;
-                document.getElementById('progress-fill').style.width = pct + '%';
-                document.getElementById('progress-text').textContent = p.currentFile ? `正在转换: ${p.currentFile} (${p.completed}/${p.total})` : '等待中...';
                 
-                document.getElementById('btn-start').style.display = data.is_running ? 'none' : 'inline-block';
-                document.getElementById('btn-stop').style.display = data.is_running ? 'inline-block' : 'none';
+                // 更新进度条
+                document.getElementById('progress-fill').style.width = pct + '%';
+                document.getElementById('progress-percentage').textContent = pct + '%';
+                
+                // 更新进度文本
+                if (p.currentFile) {
+                    document.getElementById('progress-text').textContent = `正在转换: ${p.currentFile}`;
+                    document.getElementById('progress-detail').textContent = `${p.completed} / ${p.total} 文件`;
+                } else {
+                    document.getElementById('progress-text').textContent = pct === 100 ? '转换完成！' : '等待中...';
+                    document.getElementById('progress-detail').textContent = `${p.completed} / ${p.total} 文件`;
+                }
+                
+                // 更新按钮状态
+                const btnStart = document.getElementById('btn-start');
+                const btnStop = document.getElementById('btn-stop');
+                if (btnStart) btnStart.style.display = data.is_running ? 'none' : 'inline-block';
+                if (btnStop) btnStop.style.display = data.is_running ? 'inline-block' : 'none';
+                
+                // 更新工作流指示器
+                updateWorkflowSteps();
+                
             } catch (e) {
                 console.error(e);
             }
@@ -1141,6 +1429,7 @@ INDEX_HTML = '''
                     workers: parseInt(document.getElementById('workers').value),
                     overwrite: document.getElementById('overwrite').checked
                 });
+                showNotification('开始转换...', 'info');
             } catch (e) {
                 console.error(e);
             }
@@ -1149,6 +1438,7 @@ INDEX_HTML = '''
         async function stopConversion() {
             try {
                 await api('/api/convert/stop', 'POST');
+                showNotification('转换已停止', 'warning');
             } catch (e) {
                 console.error(e);
             }
