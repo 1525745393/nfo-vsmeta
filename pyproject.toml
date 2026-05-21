@@ -84,18 +84,47 @@ Issues = "https://github.com/1525745393/TRAE--AI-NFO-to-VSMETA/issues"
 Changelog = "https://github.com/1525745393/TRAE--AI-NFO-to-VSMETA/blob/main/CHANGELOG.md"
 
 [project.scripts]
-nfo-to-vsmeta = "nfo_to_vsmeta_converter_complete:main"
-nfo-vsmeta-web = "web_ui:main"
+nfo-to-vsmeta = "server.core.converter:main"
+nfo-vsmeta-web = "ui.web.main:app"
 
 [tool.setuptools]
-py-modules = ["nfo_to_vsmeta_converter_complete", "web_ui", "single_file_converter_optimized_fixed"]
-package-dir = {"" = "."}
+packages = [
+    "server",
+    "server.core",
+    "server.api",
+    "server.api.v1",
+    "server.websocket",
+    "ui",
+    "ui.web",
+    "ui.widgets",
+    "ui.utils",
+    "config",
+    "plugins",
+]
 
 [tool.setuptools.package-data]
-nfo_to_vsmeta_converter_complete = [
-    "plugins/*.py",
-    "plugins/configs/*.json",
-    "plugins/**/*.py",
+server = [
+    "core/*.py",
+    "api/*.py",
+    "api/v1/*.py",
+    "websocket/*.py",
+]
+ui = [
+    "web/*.py",
+    "web/*.html",
+    "widgets/*.py",
+    "utils/*.py",
+]
+plugins = [
+    "*.py",
+    "configs/*.json",
+    "demo_metadata_enhancer/*.py",
+    "demo_metadata_enhancer/*.json",
+    "demo_metadata_enhancer/*.md",
+]
+config = [
+    "*.py",
+    "*.json",
 ]
 
 [tool.black]
@@ -132,7 +161,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["nfo_to_vsmeta_converter_complete"]
+source = ["server", "ui", "config", "plugins"]
 omit = ["*/tests/*", "*/test_*.py", "*/__pycache__/*"]
 
 [tool.coverage.report]

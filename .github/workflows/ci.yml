@@ -1,0 +1,91 @@
+name: CI Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[all,dev,test]"
+        
+    - name: Run tests
+      run: |
+        pytest tests/ -v --tb=short --cov=server --cov=ui --cov=config --cov=plugins --cov-report=xml
+        
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Install linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install black flake8 isort mypy pylint
+        
+    - name: Check code formatting (Black)
+      run: |
+        black --check server/ ui/ config/ plugins/ || true
+        
+    - name: Check import order (isort)
+      run: |
+        isort --check server/ ui/ config/ plugins/ || true
+        
+    - name: Lint with flake8
+      run: |
+        flake8 server/ ui/ config/ plugins/ --max-line-length=100 --ignore=E501,W503 || true
+        
+    - name: Type check with mypy
+      run: |
+        mypy server/ ui/ config/ plugins/ --ignore-missing-imports || true
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Install build tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+        
+    - name: Build package
+      run: |
+        python -m build
+        
+    - name: Check package
+      run: |
+        python -m twine check dist/*
