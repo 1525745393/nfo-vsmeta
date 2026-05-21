@@ -945,48 +945,172 @@ INDEX_HTML = '''
     <script>
         let scanResults = [];
         let selectedIndex = -1;
+        let isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         
-        // ==================== 交互体验优化 ====================
+        // ==================== 触摸设备支持 ====================
         
-        // 拖拽上传功能
-        function initDragDrop() {
-            const dropZone = document.getElementById('config-dir');
-            if (!dropZone) return;
+        // 触摸滑动支持
+        function initTouchGestures() {
+            if (!isTouchDevice) return;
             
-            dropZone.parentElement.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                dropZone.parentElement.style.border = '2px dashed var(--accent)';
-                dropZone.parentElement.style.background = 'rgba(74, 158, 255, 0.1)';
-            });
+            let touchStartX = 0;
+            let touchEndX = 0;
             
-            dropZone.parentElement.addEventListener('dragleave', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                dropZone.parentElement.style.border = '';
-                dropZone.parentElement.style.background = '';
-            });
+            document.addEventListener('touchstart', (e) => {
+                touchStartX = e.changedTouches[0].screenX;
+            }, false);
             
-            dropZone.parentElement.addEventListener('drop', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                dropZone.parentElement.style.border = '';
-                dropZone.parentElement.style.background = '';
+            document.addEventListener('touchend', (e) => {
+                touchEndX = e.changedTouches[0].screenX;
+                handleSwipe();
+            }, false);
+            
+            function handleSwipe() {
+                const swipeThreshold = 100;
+                const diff = touchStartX - touchEndX;
                 
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                    const path = files[0].path || files[0].webkitRelativePath;
-                    if (path) {
-                        const dir = path.split('/')[0];
-                        dropZone.value = '/' + dir;
-                        showNotification('已设置目录：' + dir, 'success');
+                if (Math.abs(diff) < swipeThreshold) return;
+                
+                // 左右滑动切换页面
+                if (diff > 0) {
+                    // 左滑 - 下一页
+                    const pages = ['dashboard', 'files', 'convert', 'logs'];
+                    const currentPage = document.querySelector('.page.active')?.id.replace('page-', '');
+                    const currentIndex = pages.indexOf(currentPage);
+                    if (currentIndex < pages.length - 1) {
+                        showPage(pages[currentIndex + 1]);
+                    }
+                } else {
+                    // 右滑 - 上一页
+                    const pages = ['dashboard', 'files', 'convert', 'logs'];
+                    const currentPage = document.querySelector('.page.active')?.id.replace('page-', '');
+                    const currentIndex = pages.indexOf(currentPage);
+                    if (currentIndex > 0) {
+                        showPage(pages[currentIndex - 1]);
                     }
                 }
+            }
+            
+            // 长按显示工具提示
+            document.querySelectorAll('[data-tooltip]').forEach(el => {
+                let longPressTimer;
+                
+                el.addEventListener('touchstart', (e) => {
+                    longPressTimer = setTimeout(() => {
+                        const tooltip = document.createElement('div');
+                        tooltip.className = 'tooltip touch-tooltip';
+                        tooltip.textContent = el.dataset.tooltip;
+                        tooltip.style.cssText = `
+                            position: fixed;
+                            top: 50%;
+                            left: 50%;
+                            transform: translate(-50%, -50%);
+                            background: var(--bg3);
+                            color: var(--text);
+                            padding: 1rem 1.5rem;
+                            border-radius: 8px;
+                            font-size: 1rem;
+                            box-shadow: var(--shadow-lg);
+                            z-index: 10000;
+                            white-space: nowrap;
+                            pointer-events: none;
+                        `;
+                        el._touchTooltip = tooltip;
+                        document.body.appendChild(tooltip);
+                        
+                        setTimeout(() => {
+                            if (tooltip.parentElement) {
+                                tooltip.remove();
+                            }
+                        }, 2000);
+                    }, 500);
+                });
+                
+                el.addEventListener('touchend', () => {
+                    clearTimeout(longPressTimer);
+                    if (el._touchTooltip) {
+                        el._touchTooltip.remove();
+                    }
+                });
+                
+                el.addEventListener('touchmove', () => {
+                    clearTimeout(longPressTimer);
+                    if (el._touchTooltip) {
+                        el._touchTooltip.remove();
+                    }
+                });
             });
         }
         
-        // 快捷键支持
+        // 触摸优化的拖拽上传
+        function initTouchUpload() {
+            const dropZone = document.getElementById('config-dir');
+            if (!dropZone || !isTouchDevice) return;
+            
+            // 触摸设备上显示文件选择按钮
+            const parent = dropZone.parentElement;
+            parent.style.position = 'relative';
+            
+            const uploadBtn = document.createElement('button');
+            uploadBtn.textContent = '📁 选择文件夹';
+            uploadBtn.className = 'btn btn-primary';
+            uploadBtn.style.cssText = 'position: absolute; right: 0; top: 0; height: 100%; padding: 0 1.5rem;';
+            uploadBtn.onclick = () => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.webkitdirectory = true;
+                input.onchange = (e) => {
+                    if (e.target.files.length > 0) {
+                        const path = e.target.files[0].webkitRelativePath;
+                        const dir = '/' + path.split('/')[0];
+                        dropZone.value = dir;
+                        showNotification('已设置目录：' + dir, 'success');
+                    }
+                };
+                input.click();
+            };
+            
+            parent.appendChild(uploadBtn);
+        }
+        
+        // 触摸友好的文件列表触摸支持
+        function initTouchFileNavigation() {
+            if (!isTouchDevice) return;
+            
+            // 为文件列表添加触摸滑动支持
+            const fileTree = document.getElementById('file-tree');
+            if (!fileTree) return;
+            
+            let touchStartY = 0;
+            let touchEndY = 0;
+            
+            fileTree.addEventListener('touchstart', (e) => {
+                touchStartY = e.changedTouches[0].screenY;
+            }, false);
+            
+            fileTree.addEventListener('touchend', (e) => {
+                touchEndY = e.changedTouches[0].screenY;
+                handleFileSwipe();
+            }, false);
+            
+            function handleFileSwipe() {
+                const swipeThreshold = 50;
+                const diff = touchStartY - touchEndY;
+                
+                if (Math.abs(diff) < swipeThreshold) return;
+                
+                // 上下滑动导航文件列表
+                navigateFileList(diff > 0 ? 1 : -1);
+            }
+        }
+        
+        // 快捷键支持（桌面设备）
         function initKeyboardShortcuts() {
+            if (isTouchDevice) {
+                showNotification('提示：触摸设备支持滑动切换页面', 'info');
+                return;
+            }
+            
             document.addEventListener('keydown', (e) => {
                 // Ctrl/Cmd + Enter - 开始转换
                 if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -1053,7 +1177,7 @@ INDEX_HTML = '''
             selectFile(selectedIndex);
             
             // 滚动到可见
-            const selectedEl = document.getElementById('file-' + selectedIndex);
+            const selectedEl = document.getElementById('file-' + scanResults[selectedIndex].path.replace(/[^a-zA-Z0-9]/g, '_'));
             if (selectedEl) {
                 selectedEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
@@ -1136,11 +1260,18 @@ INDEX_HTML = '''
         
         // 初始化所有交互功能
         document.addEventListener('DOMContentLoaded', () => {
-            initDragDrop();
+            initTouchGestures();
+            initTouchUpload();
+            initTouchFileNavigation();
             initKeyboardShortcuts();
             initTooltips();
             updateWorkflowSteps();
-            showNotification('快捷键提示：1-4切换页面，T切换主题，Ctrl+Enter开始转换', 'info');
+            
+            if (isTouchDevice) {
+                showNotification('触摸模式已启用：左右滑动切换页面，上下滑动浏览文件', 'info');
+            } else {
+                showNotification('快捷键提示：1-4切换页面，T切换主题，Ctrl+Enter开始转换', 'info');
+            }
         });
         
         // ==================== 工作流指示器 ====================
