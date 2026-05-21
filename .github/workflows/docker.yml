@@ -52,23 +52,28 @@ jobs:
       with:
         images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
+    - name: Get version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "VERSION=$VERSION"
+      id: version
+
     - name: Build and push to GitHub Container Registry
       uses: docker/build-push-action@v5
       with:
         context: .
         push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
+        tags: |
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-    - name: Get version
-      id: version
+    - name: Pull built image
       run: |
-        VERSION=${GITHUB_REF#refs/tags/}
-        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-        echo "GitHub Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION"
-        echo "Docker Hub Image: ${{ env.DOCKERHUB_REGISTRY }}/${{ env.DOCKERHUB_IMAGE_NAME }}:$VERSION"
+        docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+        docker images
 
     - name: Tag for Docker Hub
       run: |
