@@ -3,7 +3,7 @@
 """
 NFO to VSMETA 转换器 - Web UI 专业完整版
 ===========================================
-功能最完整的专业级界面 - 修复版
+功能最完整的专业级界面
 """
 
 import os
@@ -42,7 +42,7 @@ def _add_log(level, message):
         _state["logs"] = _state["logs"][-1000:]
 
 
-INDEX_HTML = """
+INDEX_HTML = '''
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -54,22 +54,27 @@ INDEX_HTML = """
         body { font-family: 'Segoe UI', Arial, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; color: #333; }
         .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
         
+        /* 头部样式 */
         .header { background: rgba(255,255,255,0.95); padding: 30px; border-radius: 15px; margin-bottom: 20px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
         .header h1 { font-size: 2.5em; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 10px; }
         .header p { color: #666; font-size: 1.1em; }
         
+        /* 导航栏 */
         .nav { display: flex; gap: 10px; margin-bottom: 20px; background: rgba(255,255,255,0.95); padding: 15px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
         .nav button { flex: 1; padding: 15px 20px; border: none; background: rgba(102, 126, 234, 0.1); cursor: pointer; border-radius: 10px; font-size: 16px; font-weight: 600; transition: all 0.3s; }
         .nav button:hover { background: rgba(102, 126, 234, 0.2); transform: translateY(-2px); }
         .nav button.active { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4); }
         
+        /* 页面容器 */
         .page { display: none; }
         .page.active { display: block; }
         
+        /* 卡片样式 */
         .card { background: rgba(255,255,255,0.95); padding: 25px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
         .card h2 { color: #667eea; margin-bottom: 20px; font-size: 1.8em; border-bottom: 3px solid #667eea; padding-bottom: 10px; }
         .card h3 { color: #667eea; margin: 15px 0 10px 0; font-size: 1.2em; }
         
+        /* 统计卡片 */
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin: 20px 0; }
         .stat-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 15px; text-align: center; box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3); transition: transform 0.3s; }
         .stat-card:hover { transform: translateY(-5px); }
@@ -79,11 +84,13 @@ INDEX_HTML = """
         .stat-value { font-size: 3em; font-weight: 700; }
         .stat-label { font-size: 1.1em; opacity: 0.9; }
         
+        /* 进度条 */
         .progress-container { background: rgba(102, 126, 234, 0.1); border-radius: 15px; padding: 20px; margin: 20px 0; }
         .progress-bar { height: 40px; background: rgba(102, 126, 234, 0.2); border-radius: 20px; overflow: hidden; }
         .progress-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); width: 0%; transition: width 0.5s; border-radius: 20px; position: relative; }
         .progress-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: 700; color: white; font-size: 1.1em; }
         
+        /* 按钮样式 */
         .btn { padding: 12px 24px; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; margin: 5px; font-weight: 600; transition: all 0.3s; }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
         .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
@@ -91,17 +98,21 @@ INDEX_HTML = """
         .btn-danger { background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%); color: white; }
         .btn-secondary { background: rgba(102, 126, 234, 0.1); color: #667eea; }
         
+        /* 输入框 */
         input, select { width: 100%; padding: 15px; border: 2px solid #667eea; border-radius: 10px; margin: 10px 0; font-size: 14px; background: rgba(102, 126, 234, 0.05); }
         input:focus, select:focus { outline: none; border-color: #764ba2; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
         
+        /* 复选框 */
         .checkbox-group { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
         .checkbox-group input[type="checkbox"] { width: auto; transform: scale(1.3); }
         
+        /* 文件列表 */
         .file-list { max-height: 500px; overflow-y: auto; margin: 15px 0; }
         .file-item { padding: 15px; background: rgba(102, 126, 234, 0.05); margin: 8px 0; border-radius: 10px; cursor: pointer; transition: all 0.3s; display: flex; justify-content: space-between; align-items: center; border: 2px solid transparent; }
         .file-item:hover { background: rgba(102, 126, 234, 0.15); border-color: #667eea; transform: translateX(5px); }
         .file-item.selected { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
         
+        /* 标签页 */
         .tabs { display: flex; gap: 10px; margin: 15px 0; flex-wrap: wrap; }
         .tab { padding: 12px 24px; background: rgba(102, 126, 234, 0.1); border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.3s; }
         .tab:hover { background: rgba(102, 126, 234, 0.2); }
@@ -110,15 +121,19 @@ INDEX_HTML = """
         .tab-content { display: none; padding: 20px; background: rgba(102, 126, 234, 0.05); border-radius: 10px; margin: 10px 0; }
         .tab-content.active { display: block; }
         
+        /* 代码块 */
         .code-block { background: #1e1e1e; color: #d4d4d4; padding: 20px; border-radius: 10px; font-family: 'Courier New', monospace; font-size: 13px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
         
+        /* 对比网格 */
         .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         @media (max-width: 768px) { .compare-grid { grid-template-columns: 1fr; } }
         
+        /* 图片容器 */
         .image-container { text-align: center; padding: 20px; }
         .image-container img { max-width: 100%; max-height: 400px; border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.2); transition: transform 0.3s; }
         .image-container img:hover { transform: scale(1.02); }
         
+        /* 日志框 */
         .log-box { background: #1e1e1e; color: #d4d4d4; padding: 20px; border-radius: 10px; font-family: 'Courier New', monospace; font-size: 13px; max-height: 500px; overflow-y: auto; }
         .log-entry { margin: 8px 0; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 5px; }
         .log-time { color: #667eea; margin-right: 10px; }
@@ -128,16 +143,19 @@ INDEX_HTML = """
         .log-level.error { background: #f45c43; color: white; }
         .log-level.warning { background: #f093fb; color: black; }
         
+        /* 徽章 */
         .badge { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
         .badge-success { background: #38ef7d; color: black; }
         .badge-warning { background: #f093fb; color: black; }
         .badge-danger { background: #f45c43; color: white; }
         
+        /* 详情网格 */
         .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 15px 0; }
         .detail-item { background: rgba(102, 126, 234, 0.05); padding: 15px; border-radius: 10px; }
         .detail-label { font-size: 0.9em; color: #667eea; margin-bottom: 5px; font-weight: 600; }
         .detail-value { font-size: 1.1em; font-weight: 700; }
         
+        /* 滚动条 */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: rgba(102, 126, 234, 0.1); border-radius: 4px; }
         ::-webkit-scrollbar-thumb { background: #667eea; border-radius: 4px; }
@@ -158,6 +176,7 @@ INDEX_HTML = """
             <button id="btn-logs" onclick="showPage('logs')">📋 运行日志</button>
         </div>
         
+        <!-- 仪表盘页面 -->
         <div id="page-dashboard" class="page active">
             <div class="card">
                 <h2>📈 转换统计</h2>
@@ -199,6 +218,7 @@ INDEX_HTML = """
             </div>
         </div>
         
+        <!-- 文件管理页面 -->
         <div id="page-files" class="page">
             <div class="card">
                 <h2>📂 目录扫描</h2>
@@ -229,6 +249,7 @@ INDEX_HTML = """
             </div>
         </div>
         
+        <!-- 批量转换页面 -->
         <div id="page-convert" class="page">
             <div class="card">
                 <h2>⚙️ 转换设置</h2>
@@ -257,6 +278,7 @@ INDEX_HTML = """
             </div>
         </div>
         
+        <!-- 运行日志页面 -->
         <div id="page-logs" class="page">
             <div class="card">
                 <h2>📋 运行日志</h2>
@@ -364,14 +386,22 @@ INDEX_HTML = """
             html += '<div class="detail-item"><div class="detail-label">🎬 背景图片</div><div class="detail-value">' + (data.hasFanart ? '✅ 存在' : '⏳ 缺失') + '</div></div>';
             html += '</div>';
             
+            // 标签页
             html += '<div class="tabs">';
-            html += '<button class="tab active" id="tab-btn-nfo" onclick="showTab(' + "'nfo'" + ')">📄 NFO内容</button>';
-            html += '<button class="tab" id="tab-btn-vsmeta" onclick="showTab(' + "'vsmeta'" + ')">📝 VSMETA内容</button>';
-            html += '<button class="tab" id="tab-btn-compare" onclick="showTab(' + "'compare'" + ')">🔄 对比视图</button>';
+            html += '<button class="tab active" id="tab-btn-nfo" onclick="showTab(\'nfo\')">📄 NFO内容</button>';
+            html += '<button class="tab" id="tab-btn-vsmeta" onclick="showTab(\'vsmeta\')">📝 VSMETA内容</button>';
+            html += '<button class="tab" id="tab-btn-compare" onclick="showTab(\'compare\')">🔄 对比视图</button>';
+            if (data.hasPoster) html += '<button class="tab" onclick="showImage(\'' + encodeURIComponent(data.posterUrl || '') + '\', \'poster\')">🖼️ 封面</button>';
+            if (data.hasFanart) html += '<button class="tab" onclick="showImage(\'' + encodeURIComponent(data.fanartUrl || '') + '\', \'fanart\')">🎬 背景图</button>';
             html += '</div>';
             
+            // NFO内容
             html += '<div id="tab-nfo" class="tab-content active"><div class="code-block" id="nfo-content"></div></div>';
+            
+            // VSMETA内容
             html += '<div id="tab-vsmeta" class="tab-content"><div class="code-block" id="vsmeta-content"></div></div>';
+            
+            // 对比视图
             html += '<div id="tab-compare" class="tab-content">';
             html += '<div class="compare-grid">';
             html += '<div><h4 style="color: #667eea; margin-bottom: 10px;">📄 NFO内容</h4><div class="code-block" id="compare-nfo"></div></div>';
@@ -380,31 +410,11 @@ INDEX_HTML = """
             
             detail.innerHTML = html;
             
+            // 填充内容
             document.getElementById('nfo-content').textContent = data.nfoContent || '无NFO内容';
             document.getElementById('vsmeta-content').textContent = data.vsmetaContent || '无VSMETA内容';
             document.getElementById('compare-nfo').textContent = data.nfoContent || '无NFO内容';
             document.getElementById('compare-vsmeta').textContent = data.vsmetaContent || '无VSMETA内容';
-            
-            const tabs = document.createElement('div');
-            tabs.className = 'tabs';
-            tabs.style.marginTop = '20px';
-            if (data.hasPoster) {
-                const btn = document.createElement('button');
-                btn.className = 'tab';
-                btn.textContent = '🖼️ 封面';
-                btn.onclick = function() { showImageSafe(data.posterUrl, 'poster'); };
-                tabs.appendChild(btn);
-            }
-            if (data.hasFanart) {
-                const btn = document.createElement('button');
-                btn.className = 'tab';
-                btn.textContent = '🎬 背景图';
-                btn.onclick = function() { showImageSafe(data.fanartUrl, 'fanart'); };
-                tabs.appendChild(btn);
-            }
-            if (data.hasPoster || data.hasFanart) {
-                detail.appendChild(tabs);
-            }
         }
         
         function showTab(tabName) {
@@ -418,12 +428,12 @@ INDEX_HTML = """
             if (content) content.classList.add('active');
         }
         
-        function showImageSafe(path, type) {
-            if (!path) return;
+        function showImage(url, type) {
+            if (!url) return;
             const detail = document.getElementById('file-detail');
-            const btnHtml = '<button class="btn btn-primary" style="margin-bottom: 15px;" onclick="selectFile(' + files.indexOf(selectedFile) + ')">← 返回详情</button>';
-            const imgHtml = '<div class="image-container"><img src="/api/image/' + path + '" alt="' + type + '"></div>';
-            detail.innerHTML = '<div class="tab-content active">' + btnHtml + imgHtml + '</div>';
+            const btn = '<button class="btn btn-primary" style="margin-bottom: 15px;" onclick="selectFile(' + files.indexOf(selectedFile) + ')">← 返回详情</button>';
+            const img = '<div class="image-container"><img src="/api/image/' + decodeURIComponent(url) + '" alt="' + type + '"></div>';
+            detail.innerHTML = '<div class="tab-content active">' + btn + img + '</div>';
         }
         
         async function refreshStats() {
@@ -515,7 +525,7 @@ INDEX_HTML = """
     </script>
 </body>
 </html>
-"""
+'''
 
 
 @app.route('/')
@@ -591,13 +601,13 @@ def run_conversion_cli(directory):
         cmd = [
             sys.executable,
             '-c',
-            '''
+            f'''
 import sys
-sys.path.insert(0, "''' + os.path.dirname(os.path.abspath(__file__)) + '''")
+sys.path.insert(0, "{os.path.dirname(os.path.abspath(__file__))}")
 from nfo_to_vsmeta_converter_complete import NFOToVSMETAConverter, Config
 
 config = Config()
-config.directory = "''' + directory + '''"
+config.directory = "{directory}"
 config.max_workers = 4
 
 converter = NFOToVSMETAConverter(config)
@@ -607,11 +617,11 @@ for dirname, filename in files:
     try:
         result = converter._process_single_file(dirname, filename)
         if result.get('success'):
-            print(f"SUCCESS: {filename}")
+            print(f"SUCCESS: {{filename}}")
         else:
-            print(f"FAILED: {filename} - {result.get('error', 'Unknown error')}")
+            print(f"FAILED: {{filename}} - {{result.get('error', 'Unknown error')}}")
     except Exception as e:
-        print(f"ERROR: {filename} - {str(e)}")
+        print(f"ERROR: {{filename}} - {{str(e)}}")
 '''
         ]
         
