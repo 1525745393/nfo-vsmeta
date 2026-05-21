@@ -626,7 +626,7 @@ INDEX_HTML = """
                 </div>
                 
                 <div style="margin-top: 20px;">
-                    <button id="btn-start" class="btn btn-success" onclick="startConversion();">▶️ 开始转换</button>
+                    <button id="btn-start" class="btn btn-success" onclick="startConversionFromConvertPage();">▶️ 开始转换</button>
                     <button id="btn-stop" class="btn btn-danger" onclick="stopConversion();" style="display: none;">⏹️ 停止转换</button>
                 </div>
             </div>
@@ -1057,15 +1057,39 @@ INDEX_HTML = """
             if (btnStop) btnStop.style.display = data.is_running ? 'inline-block' : 'none';
         }
         
-        async function startConversion() {
-            const dir = document.getElementById('convert-dir').value;
-            await api('/api/convert/start', 'POST', {dir: dir});
-            alert('转换已开始！');
-        }
-        
         async function stopConversion() {
             await api('/api/convert/stop', 'POST');
             alert('转换已停止');
+        }
+        
+        async function startConversionFromConvertPage() {
+            const dir = document.getElementById('convert-dir').value;
+            if (!dir) {
+                alert('请输入要转换的目录路径！');
+                return;
+            }
+            
+            if (confirm('确定要开始转换吗？')) {
+                try {
+                    const response = await fetch('/api/convert/start', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({dir: dir})
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        alert('✓ 转换任务已启动！');
+                        loadConversionStatus();
+                    } else {
+                        alert('✗ 启动转换失败：' + (result.error || '未知错误'));
+                    }
+                } catch (e) {
+                    console.error('启动转换失败:', e);
+                    alert('✗ 启动转换失败：' + e.message);
+                }
+            }
         }
         
         async function refreshLogs() {
