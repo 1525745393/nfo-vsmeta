@@ -932,12 +932,14 @@ INDEX_HTML = """
             nodes.forEach((node, index) => {
                 if (node.type === 'folder') {
                     const isSelected = selectedFolders.includes(node.path);
+                    const nodePathAttr = encodeURIComponent(node.path);
+                    const hasChildren = node.children ? node.children.length : 0;
                     html += '<div class="tree-node' + (isSelected ? ' selected' : '') + '">';
-                    html += '<input type="checkbox" class="folder-checkbox" ' + (isSelected ? 'checked' : '') + ' onclick="event.stopPropagation(); toggleFolderSelection(\'' + encodeURIComponent(node.path) + '\', ' + (node.children ? node.children.length : 0) + ');">';
+                    html += `<input type="checkbox" class="folder-checkbox" ${isSelected ? 'checked' : ''} onclick="handleFolderCheckbox(this, '${nodePathAttr}', ${hasChildren});">`;
                     html += '<span class="tree-toggle" onclick="toggleNode(this, ' + level + ')">' + 
                             (node.expanded ? '▼' : '▶') + '</span>';
                     html += '<span class="tree-icon tree-folder">' + (node.expanded ? '📂' : '📁') + '</span>';
-                    html += '<span data-path="' + encodeURIComponent(node.path) + '" onclick="selectFolder(this);" style="cursor: pointer; user-select: none;">' + node.name + '</span>';
+                    html += '<span data-path="' + nodePathAttr + '" onclick="selectFolder(this);" style="cursor: pointer; user-select: none;">' + node.name + '</span>';
                     
                     if (node.children && node.children.length > 0) {
                         html += '<div class="tree-children' + (node.expanded ? '' : ' collapsed') + '">';
@@ -947,15 +949,21 @@ INDEX_HTML = """
                     html += '</div>';
                 } else {
                     const isSelected = selectedFile && selectedFile.path === node.path;
+                    const nodePathAttr = encodeURIComponent(node.path);
                     html += '<div class="tree-node' + (isSelected ? ' selected' : '') + '">';
                     html += '<span class="tree-toggle" style="visibility: hidden;">•</span>';
                     html += '<span class="tree-icon tree-file">🎬</span>';
-                    html += '<span data-path="' + encodeURIComponent(node.path) + '" onclick="selectFileByPath(decodeURIComponent(this.dataset.path))">' + node.name + '</span>';
+                    html += '<span data-path="' + nodePathAttr + '" onclick="selectFileByPath(decodeURIComponent(this.dataset.path))">' + node.name + '</span>';
                     html += '<span class="badge badge-' + node.statusClass + '" style="margin-left: 10px;">' + node.statusText + '</span>';
                     html += '</div>';
                 }
             });
             return html;
+        }
+        
+        function handleFolderCheckbox(checkbox, path, hasChildren) {
+            event.stopPropagation();
+            toggleFolderSelection(path, hasChildren);
         }
         
         function toggleNode(element, level) {
