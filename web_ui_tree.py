@@ -558,22 +558,34 @@ INDEX_HTML = """
                     <div style="margin-top: 10px; font-size: 0.9em; color: var(--text-secondary);">或者点击下方按钮选择目录</div>
                 </div>
                 
-                <input type="text" id="scan-dir" value="/workspace/test_movies" placeholder="输入目录路径">
-                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
-                    <button class="btn btn-secondary" style="font-size: 13px; padding: 6px 12px;" onclick="document.getElementById('scan-dir').value='/workspace/test_movies'; refreshFiles();">
-                        📁 测试文件夹
+                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                    <button class="btn btn-secondary" style="padding: 8px 12px;" onclick="goToParentDir();" title="返回上一级">
+                        ⬆️ 上一级
                     </button>
-                    <button class="btn btn-secondary" style="font-size: 13px; padding: 6px 12px;" onclick="document.getElementById('scan-dir').value='/workspace'; refreshFiles();">
-                        💼 工作区
-                    </button>
-                    <button class="btn btn-secondary" style="font-size: 13px; padding: 6px 12px;" onclick="document.getElementById('scan-dir').value='/'; refreshFiles();">
-                        🏠 根目录
-                    </button>
+                    <input type="text" id="scan-dir" value="/workspace/test_movies" placeholder="输入目录路径" style="flex: 1;">
                 </div>
+                
+                <div style="background: var(--bg-card); padding: 10px; border-radius: 8px; margin-bottom: 10px; border: 1px dashed var(--primary);">
+                    <div style="font-size: 0.85em; color: var(--text-secondary); margin-bottom: 5px;">📍 快捷访问</div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="btn btn-secondary" style="font-size: 12px; padding: 5px 10px;" onclick="document.getElementById('scan-dir').value='/workspace/test_movies'; refreshFiles();">
+                            📁 测试文件夹
+                        </button>
+                        <button class="btn btn-secondary" style="font-size: 12px; padding: 5px 10px;" onclick="document.getElementById('scan-dir').value='/workspace'; refreshFiles();">
+                            💼 工作区
+                        </button>
+                        <button class="btn btn-secondary" style="font-size: 12px; padding: 5px 10px;" onclick="document.getElementById('scan-dir').value='/'; refreshFiles();">
+                            🏠 根目录
+                        </button>
+                    </div>
+                </div>
+                
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button class="btn btn-primary" onclick="refreshFiles();">🔄 扫描文件</button>
-                    <button class="btn btn-secondary" onclick="expandAll();">⬇️ 展开全部</button>
-                    <button class="btn btn-secondary" onclick="collapseAll();">⬆️ 折叠全部</button>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-primary" onclick="refreshFiles();">🔄 扫描</button>
+                        <button class="btn btn-secondary" onclick="expandAll();">⬇️ 展开全部</button>
+                        <button class="btn btn-secondary" onclick="collapseAll();">⬆️ 折叠全部</button>
+                    </div>
                     <select id="filter-status" onchange="renderTree();" style="flex: 1; min-width: 150px;">
                         <option value="all">全部文件</option>
                         <option value="converted">✅ 已转换</option>
@@ -584,8 +596,10 @@ INDEX_HTML = """
             </div>
             
             <div class="card fade-in">
-                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-                    <h2 style="margin: 0;">🌳 文件夹树形结构 (<span id="file-count">0</span>个文件)</h2>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <h2 style="margin: 0;">🌳 文件夹树形结构 (<span id="file-count">0</span>个文件)</h2>
+                    </div>
                     <button class="btn btn-success" onclick="startConversion()" style="padding: 8px 20px; font-size: 14px;">
                         ▶ 开始转换
                     </button>
@@ -756,7 +770,13 @@ INDEX_HTML = """
         async function refreshFiles() {
             const dir = document.getElementById('scan-dir').value;
             const tree = document.getElementById('file-tree');
-            tree.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--primary);">🔄 正在扫描...</div>';
+            
+            tree.innerHTML = 
+                '<div style="text-align: center; padding: 60px; color: var(--primary);">' +
+                    '<div style="font-size: 3em; margin-bottom: 20px;">🔄</div>' +
+                    '<div style="font-size: 1.2em; margin-bottom: 10px;">正在扫描...</div>' +
+                    '<div style="font-size: 0.9em; color: var(--text-secondary);">' + dir + '</div>' +
+                '</div>';
             
             try {
                 const data = await api('/api/scan-tree?dir=' + encodeURIComponent(dir));
@@ -766,7 +786,12 @@ INDEX_HTML = """
                 await refreshStats();
             } catch (e) {
                 console.error(e);
-                tree.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--danger);">❌ 扫描失败</div>';
+                tree.innerHTML = 
+                    '<div style="text-align: center; padding: 60px; color: var(--danger);">' +
+                        '<div style="font-size: 3em; margin-bottom: 20px;">❌</div>' +
+                        '<div style="font-size: 1.2em; margin-bottom: 10px;">扫描失败</div>' +
+                        '<div style="font-size: 0.9em; color: var(--text-secondary);">' + dir + '</div>' +
+                    '</div>';
             }
         }
         
@@ -839,8 +864,9 @@ INDEX_HTML = """
                     html += '<div class="tree-node">';
                     html += '<span class="tree-toggle" onclick="toggleNode(this, ' + level + ')">' + 
                             (node.expanded ? '▼' : '▶') + '</span>';
-                    html += '<span class="tree-icon tree-folder">📁</span>';
-                    html += '<span data-path="' + encodeURIComponent(node.path) + '" onclick="selectFolder(this);" style="cursor: pointer;">' + node.name + '</span>';
+                    html += '<span class="tree-icon tree-folder">' + (node.expanded ? '📂' : '📁') + '</span>';
+                    html += '<span data-path="' + encodeURIComponent(node.path) + '" onclick="selectFolder(this);" style="cursor: pointer; user-select: none;">' + node.name + '</span>';
+                    html += '<span style="font-size: 0.8em; color: var(--text-secondary); margin-left: 8px;">(双击扫描)</span>';
                     
                     if (node.children && node.children.length > 0) {
                         html += '<div class="tree-children' + (node.expanded ? '' : ' collapsed') + '">';
@@ -873,10 +899,29 @@ INDEX_HTML = """
             }
         }
         
+        function goToParentDir() {
+            const currentPath = document.getElementById('scan-dir').value;
+            if (currentPath && currentPath !== '/') {
+                const parentPath = currentPath.substring(0, currentPath.lastIndexOf('/')) || '/';
+                document.getElementById('scan-dir').value = parentPath;
+                refreshFiles();
+            }
+        }
+
+        let folderClickTimer = null;
         function selectFolder(element) {
             const path = decodeURIComponent(element.dataset.path);
             document.getElementById('scan-dir').value = path;
-            alert('已选择文件夹: ' + path + ' 点击「扫描文件」按钮以加载该目录');
+            
+            if (folderClickTimer) {
+                clearTimeout(folderClickTimer);
+                folderClickTimer = null;
+                refreshFiles();
+            } else {
+                folderClickTimer = setTimeout(() => {
+                    folderClickTimer = null;
+                }, 300);
+            }
         }
         
         function selectFileByPath(path) {
