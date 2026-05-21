@@ -65,7 +65,7 @@ jobs:
     - name: Get version
       id: version
       run: |
-        VERSION=${GITHUB_REF#refs/tags/v}
+        VERSION=${GITHUB_REF#refs/tags/}
         echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
         echo "GitHub Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION"
         echo "Docker Hub Image: ${{ env.DOCKERHUB_REGISTRY }}/${{ env.DOCKERHUB_IMAGE_NAME }}:$VERSION"
@@ -74,7 +74,7 @@ jobs:
       run: |
         docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }} ${{ env.DOCKERHUB_REGISTRY }}/${{ env.DOCKERHUB_IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
         docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }} ${{ env.DOCKERHUB_REGISTRY }}/${{ env.DOCKERHUB_IMAGE_NAME }}:latest
-        docker images
+        docker images | grep nfo
 
     - name: Push to Docker Hub
       run: |
