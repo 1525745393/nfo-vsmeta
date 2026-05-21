@@ -474,6 +474,20 @@ INDEX_HTML = """
         }
         .detail-value { font-size: 1.1em; font-weight: 700; }
         
+        .folder-checkbox {
+            width: 18px;
+            height: 18px;
+            margin-right: 8px;
+            cursor: pointer;
+            accent-color: var(--primary);
+        }
+        
+        .tree-node.selected {
+            background: rgba(102, 126, 234, 0.15);
+            border-radius: 5px;
+            padding: 3px 5px;
+        }
+        
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: rgba(102, 126, 234, 0.1); border-radius: 4px; }
         ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
@@ -599,10 +613,34 @@ INDEX_HTML = """
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
                     <div style="display: flex; align-items: center; gap: 15px;">
                         <h2 style="margin: 0;">🌳 文件夹树形结构 (<span id="file-count">0</span>个文件)</h2>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-secondary" style="font-size: 12px; padding: 5px 10px;" onclick="selectAllFolders();">☑️ 全选</button>
+                            <button class="btn btn-secondary" style="font-size: 12px; padding: 5px 10px;" onclick="deselectAllFolders();">☐ 取消全选</button>
+                        </div>
                     </div>
                     <button class="btn btn-success" onclick="startConversion()" style="padding: 8px 20px; font-size: 14px;">
                         ▶ 开始转换
                     </button>
+                </div>
+                
+                <div id="batch-actions" class="card fade-in" style="display: none; background: rgba(102, 126, 234, 0.1); border: 2px solid var(--primary); margin-bottom: 15px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.5em;">📋</span>
+                            <div>
+                                <div style="font-weight: 700; color: var(--primary);">已选择 <span id="selected-count">0</span> 个文件夹</div>
+                                <div style="font-size: 0.85em; color: var(--text-secondary);">可以对这些文件夹进行批量操作</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn btn-primary" onclick="convertSelectedFolders();">
+                                🚀 转换选中
+                            </button>
+                            <button class="btn btn-secondary" onclick="deselectAllFolders();">
+                                ✕ 清除选择
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="search-container">
@@ -614,6 +652,10 @@ INDEX_HTML = """
                         oninput="handleSearch()"
                     >
                     <span class="search-icon">🔍</span>
+                </div>
+                
+                <div style="background: rgba(102, 126, 234, 0.05); padding: 8px 12px; border-radius: 8px; margin-bottom: 10px; font-size: 0.85em; color: var(--text-secondary);">
+                    💡 <strong>提示：</strong>点击复选框选择文件夹（将自动包含子文件夹），选中后可进行批量转换操作
                 </div>
                 
                 <div class="tree-view" id="file-tree">
@@ -700,7 +742,9 @@ INDEX_HTML = """
         let fileTree = [];
         let flatFiles = [];
         let selectedFile = null;
+        let selectedFolders = [];
         let searchTimeout = null;
+        let selectionMode = false;
         
         // 主题切换
         function toggleTheme() {
@@ -887,12 +931,13 @@ INDEX_HTML = """
             let html = '';
             nodes.forEach((node, index) => {
                 if (node.type === 'folder') {
-                    html += '<div class="tree-node">';
+                    const isSelected = selectedFolders.includes(node.path);
+                    html += '<div class="tree-node' + (isSelected ? ' selected' : '') + '">';
+                    html += '<input type="checkbox" class="folder-checkbox" ' + (isSelected ? 'checked' : '') + ' onclick="event.stopPropagation(); toggleFolderSelection(\'' + encodeURIComponent(node.path) + '\', ' + (node.children ? node.children.length : 0) + ');">';
                     html += '<span class="tree-toggle" onclick="toggleNode(this, ' + level + ')">' + 
                             (node.expanded ? '▼' : '▶') + '</span>';
                     html += '<span class="tree-icon tree-folder">' + (node.expanded ? '📂' : '📁') + '</span>';
                     html += '<span data-path="' + encodeURIComponent(node.path) + '" onclick="selectFolder(this);" style="cursor: pointer; user-select: none;">' + node.name + '</span>';
-                    html += '<span style="font-size: 0.8em; color: var(--text-secondary); margin-left: 8px;">(双击扫描)</span>';
                     
                     if (node.children && node.children.length > 0) {
                         html += '<div class="tree-children' + (node.expanded ? '' : ' collapsed') + '">';
@@ -974,6 +1019,122 @@ INDEX_HTML = """
                     folderClickTimer = null;
                 }, 300);
             }
+        }
+        
+        function toggleFolderSelection(path, hasChildren) {
+            const decodedPath = decodeURIComponent(path);
+            const index = selectedFolders.indexOf(decodedPath);
+            
+            if (index === -1) {
+                selectedFolders.push(decodedPath);
+                if (hasChildren > 0) {
+                    selectAllChildFolders(fileTree, decodedPath);
+                }
+            } else {
+                selectedFolders.splice(index, 1);
+                if (hasChildren > 0) {
+                    deselectAllChildFolders(fileTree, decodedPath);
+                }
+            }
+            
+            updateSelectionUI();
+            updateBatchActionsUI();
+        }
+        
+        function selectAllChildFolders(nodes, parentPath) {
+            for (const node of nodes) {
+                if (node.type === 'folder') {
+                    const fullPath = node.path;
+                    if (fullPath.startsWith(parentPath + '/')) {
+                        if (!selectedFolders.includes(fullPath)) {
+                            selectedFolders.push(fullPath);
+                        }
+                        if (node.children && node.children.length > 0) {
+                            selectAllChildFolders(node.children, parentPath);
+                        }
+                    }
+                }
+            }
+        }
+        
+        function deselectAllChildFolders(nodes, parentPath) {
+            for (const node of nodes) {
+                if (node.type === 'folder') {
+                    const fullPath = node.path;
+                    if (fullPath.startsWith(parentPath + '/')) {
+                        const idx = selectedFolders.indexOf(fullPath);
+                        if (idx !== -1) {
+                            selectedFolders.splice(idx, 1);
+                        }
+                        if (node.children && node.children.length > 0) {
+                            deselectAllChildFolders(node.children, parentPath);
+                        }
+                    }
+                }
+            }
+        }
+        
+        function updateSelectionUI() {
+            const checkboxes = document.querySelectorAll('.folder-checkbox');
+            checkboxes.forEach(checkbox => {
+                const folderDiv = checkbox.closest('.tree-node');
+                const pathSpan = folderDiv.querySelector('[data-path]');
+                if (pathSpan) {
+                    const path = decodeURIComponent(pathSpan.dataset.path);
+                    checkbox.checked = selectedFolders.includes(path);
+                    folderDiv.classList.toggle('selected', selectedFolders.includes(path));
+                }
+            });
+        }
+        
+        function updateBatchActionsUI() {
+            const batchActions = document.getElementById('batch-actions');
+            const selectedCount = document.getElementById('selected-count');
+            if (batchActions && selectedCount) {
+                if (selectedFolders.length > 0) {
+                    batchActions.style.display = 'block';
+                    selectedCount.textContent = selectedFolders.length;
+                } else {
+                    batchActions.style.display = 'none';
+                    selectedCount.textContent = '0';
+                }
+            }
+        }
+        
+        function selectAllFolders() {
+            collectAllFolders(fileTree);
+            updateSelectionUI();
+            updateBatchActionsUI();
+        }
+        
+        function deselectAllFolders() {
+            selectedFolders = [];
+            updateSelectionUI();
+            updateBatchActionsUI();
+        }
+        
+        function collectAllFolders(nodes) {
+            for (const node of nodes) {
+                if (node.type === 'folder') {
+                    if (!selectedFolders.includes(node.path)) {
+                        selectedFolders.push(node.path);
+                    }
+                    if (node.children && node.children.length > 0) {
+                        collectAllFolders(node.children);
+                    }
+                }
+            }
+        }
+        
+        function convertSelectedFolders() {
+            if (selectedFolders.length === 0) {
+                alert('请先选择要转换的文件夹');
+                return;
+            }
+            
+            const dir = selectedFolders[0];
+            document.getElementById('scan-dir').value = dir;
+            showPage('convert');
         }
         
         function selectFileByPath(path) {
