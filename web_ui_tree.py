@@ -876,7 +876,7 @@ INDEX_HTML = """
         function selectFolder(element) {
             const path = decodeURIComponent(element.dataset.path);
             document.getElementById('scan-dir').value = path;
-            alert('已选择文件夹: ' + path + '\n点击「扫描文件」按钮以加载该目录');
+            alert('已选择文件夹: ' + path + ' 点击「扫描文件」按钮以加载该目录');
         }
         
         function selectFileByPath(path) {
