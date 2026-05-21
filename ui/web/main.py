@@ -1626,8 +1626,8 @@ def run_conversion_cli(directory, workers=4, retry_attempts=3, retry_delay=1, ma
             '-c',
             '''
 import sys
-sys.path.insert(0, "''' + os.path.dirname(os.path.abspath(__file__)) + '''")
-from nfo_to_vsmeta_converter_complete import NFOToVSMETAConverter, Config
+sys.path.insert(0, "''' + os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) + '''")
+from server.core.converter import NFOToVSMETAConverter, Config
 
 config = Config()
 config.directory = "''' + directory + '''"

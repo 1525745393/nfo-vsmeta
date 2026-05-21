@@ -88,7 +88,7 @@ start_webui() {
     fi
     
     # 启动服务
-    python3 web_ui.py --host 0.0.0.0 --port $port --debug >> $LOG_FILE 2>&1 &
+    python3 ui/web/main.py --host 0.0.0.0 --port $port --debug >> $LOG_FILE 2>&1 &
     local pid=$!
     
     # 等待服务启动
