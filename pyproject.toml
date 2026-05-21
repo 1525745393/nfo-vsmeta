@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nfo-to-vsmeta"
-version = "2.0.1"
+version = "2.0.2"
 description = "将 Kodi/XBMC 格式的 NFO 元数据文件转换为群晖 Video Station 的 VSMETA 格式"
 readme = "README.md"
 license = {text = "MIT"}
