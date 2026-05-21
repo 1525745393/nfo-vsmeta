@@ -677,10 +677,10 @@ INDEX_HTML = '''
     </div>
     
     <div class="nav">
-        <button class="nav-btn active" onclick="showPage('dashboard')">📊 仪表盘</button>
-        <button class="nav-btn" onclick="showPage('files')">📁 文件</button>
-        <button class="nav-btn" onclick="showPage('convert')">🚀 转换</button>
-        <button class="nav-btn" onclick="showPage('logs')">📋 日志</button>
+        <button class="nav-btn active" data-page="dashboard" onclick="showPage('dashboard')">📊 仪表盘</button>
+        <button class="nav-btn" data-page="files" onclick="showPage('files')">📁 文件</button>
+        <button class="nav-btn" data-page="convert" onclick="showPage('convert')">🚀 转换</button>
+        <button class="nav-btn" data-page="logs" onclick="showPage('logs')">📋 日志</button>
     </div>
     
     <div class="page active" id="page-dashboard">
@@ -819,12 +819,12 @@ INDEX_HTML = '''
                 <h3 style="margin-bottom: 0.75rem;">📋 文件详情</h3>
                 <div class="detail">
                     <div class="detail-tabs">
-                        <button class="detail-tab active" onclick="showDetail('overview')">📋 概览</button>
-                        <button class="detail-tab" onclick="showDetail('nfo')">📄 NFO</button>
-                        <button class="detail-tab" onclick="showDetail('vsmeta')">📝 VSMETA</button>
-                        <button class="detail-tab" onclick="showDetail('compare')">🔄 对比</button>
-                        <button class="detail-tab" onclick="showDetail('poster')">🖼️ 封面</button>
-                        <button class="detail-tab" onclick="showDetail('fanart')">🎬 背景图</button>
+                        <button class="detail-tab active" data-tab="overview" onclick="showDetail('overview')">📋 概览</button>
+                        <button class="detail-tab" data-tab="nfo" onclick="showDetail('nfo')">📄 NFO</button>
+                        <button class="detail-tab" data-tab="vsmeta" onclick="showDetail('vsmeta')">📝 VSMETA</button>
+                        <button class="detail-tab" data-tab="compare" onclick="showDetail('compare')">🔄 对比</button>
+                        <button class="detail-tab" data-tab="poster" onclick="showDetail('poster')">🖼️ 封面</button>
+                        <button class="detail-tab" data-tab="fanart" onclick="showDetail('fanart')">🎬 背景图</button>
                     </div>
                     
                     <div class="detail-content active" id="detail-overview">
@@ -1349,7 +1349,7 @@ INDEX_HTML = '''
         
         function showPage(pageName) {
             document.querySelectorAll('.nav-btn').forEach(btn => 
-                btn.classList.toggle('active', btn.textContent.includes(pageName)));
+                btn.classList.toggle('active', btn.dataset.page === pageName));
             
             document.querySelectorAll('.page').forEach(page => 
                 page.classList.toggle('active', page.id === 'page-' + pageName));
@@ -1364,7 +1364,7 @@ INDEX_HTML = '''
         
         function showDetail(tab) {
             document.querySelectorAll('.detail-tab').forEach(t => 
-                t.classList.toggle('active', t.textContent.includes(tab)));
+                t.classList.toggle('active', t.dataset.tab === tab));
             
             document.querySelectorAll('.detail-content').forEach(c => 
                 c.classList.toggle('active', c.id === 'detail-' + tab));
