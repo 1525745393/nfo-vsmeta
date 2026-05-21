@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-NFO to VSMETA 转换器 - Web UI 简化版
-=====================================
+NFO to VSMETA 转换器 - Web UI 完整功能版（修复版）
+==================================================
 """
 
 import os
@@ -14,12 +14,14 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
-    from flask import Flask, render_template_string, jsonify, request
+    from flask import Flask, render_template_string, jsonify, request, send_file
     HAS_FLASK = True
 except ImportError:
     HAS_FLASK = False
 
-app = Flask(__name__)
+app = None
+if HAS_FLASK:
+    app = Flask(__name__)
 
 _state = {
     "is_running": False,
@@ -48,127 +50,98 @@ INDEX_HTML = '''
     <title>NFO转VSMETA转换器</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; background: #1a1a2e; color: #fff; padding: 20px; }
-        .header { background: #16213e; padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center; }
+        body { font-family: Arial, sans-serif; background: #f5f5f5; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { background: #2196F3; color: white; padding: 30px; text-align: center; border-radius: 8px; margin-bottom: 20px; }
         .nav { display: flex; gap: 10px; margin-bottom: 20px; }
-        .nav button {
-            padding: 15px 25px; border: none; border-radius: 8px; cursor: pointer;
-            font-size: 16px; background: #0f3460; color: #fff; flex: 1;
-        }
-        .nav button:hover { background: #e94560; }
-        .nav button.active { background: #e94560; }
-        .page { display: none; padding: 20px; }
+        .nav button { flex: 1; padding: 15px; border: none; background: #e0e0e0; cursor: pointer; border-radius: 5px; font-size: 16px; }
+        .nav button.active { background: #2196F3; color: white; }
+        .page { display: none; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         .page.active { display: block; }
-        .card { background: #16213e; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; margin: 5px; }
-        .btn-primary { background: #e94560; color: #fff; }
-        .btn-secondary { background: #0f3460; color: #fff; }
-        .btn:hover { opacity: 0.8; }
-        input { width: 100%; padding: 12px; border: 2px solid #0f3460; border-radius: 8px; background: #1a1a2e; color: #fff; margin: 5px 0; }
-        .tree-item { padding: 12px; background: #0f3460; margin: 5px 0; border-radius: 8px; cursor: pointer; }
-        .tree-item:hover { background: #e94560; }
-        .tree-item.selected { background: #e94560; border: 2px solid #fff; }
-        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-left: 10px; }
-        .badge-success { background: #4ade80; color: #000; }
-        .badge-warning { background: #fbbf24; color: #000; }
-        .badge-danger { background: #f87171; color: #000; }
-        .progress-bar { height: 30px; background: #0f3460; border-radius: 15px; overflow: hidden; margin: 10px 0; }
-        .progress-fill { height: 100%; background: linear-gradient(90deg, #e94560, #0f3460); width: 0%; transition: width 0.5s; }
-        .log-box { background: #0f3460; padding: 15px; border-radius: 8px; max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+        .card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ddd; }
+        .btn { padding: 12px 24px; border: none; background: #2196F3; color: white; cursor: pointer; border-radius: 5px; margin: 5px; }
+        .btn:hover { background: #1976D2; }
+        input, select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
+        .file-item { padding: 12px; background: #f9f9f9; margin: 8px 0; border-radius: 5px; cursor: pointer; }
+        .file-item:hover { background: #e3f2fd; }
+        .badge { padding: 4px 8px; border-radius: 3px; font-size: 12px; margin-left: 10px; }
+        .success { background: #4CAF50; color: white; }
+        .warning { background: #FF9800; color: white; }
+        .danger { background: #f44336; color: white; }
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+        .stat { background: #2196F3; color: white; padding: 20px; text-align: center; border-radius: 5px; }
+        .stat-value { font-size: 2.5em; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🎬 NFO转VSMETA转换器</h1>
-    </div>
-    
-    <div class="nav">
-        <button id="btn-dashboard" class="active" onclick="showPage('dashboard')">📊 仪表盘</button>
-        <button id="btn-files" onclick="showPage('files')">📁 文件</button>
-        <button id="btn-convert" onclick="showPage('convert')">🚀 转换</button>
-        <button id="btn-logs" onclick="showPage('logs')">📋 日志</button>
-    </div>
-    
-    <div id="page-dashboard" class="page active">
-        <div class="card">
-            <h2>📈 转换统计</h2>
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0;">
-                <div style="text-align: center;">
-                    <div style="font-size: 32px; color: #4ade80;">0</div>
-                    <div>✅ 已转换</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 32px; color: #fbbf24;">0</div>
-                    <div>⏳ 待转换</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 32px; color: #f87171;">0</div>
-                    <div>❌ 失败</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 32px; color: #60a5fa;">0</div>
-                    <div>📁 总数</div>
-                </div>
-            </div>
-            <div class="progress-bar">
-                <div id="progress-fill" class="progress-fill"></div>
-            </div>
-            <div id="progress-text" style="text-align: center; margin: 10px 0;">等待中...</div>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 NFO转VSMETA转换器</h1>
+            <p>完整功能版</p>
         </div>
         
-        <div class="card">
-            <h2>⚡ 快捷操作</h2>
-            <button class="btn btn-primary" onclick="showPage('files'); refreshFiles();">📁 扫描文件</button>
-            <button class="btn btn-primary" onclick="showPage('convert');">🚀 开始转换</button>
-            <button class="btn btn-secondary" onclick="showPage('logs'); refreshLogs();">📋 查看日志</button>
-        </div>
-    </div>
-    
-    <div id="page-files" class="page">
-        <div class="card">
-            <h2>📂 选择目录</h2>
-            <input type="text" id="scan-dir" value="/workspace/test_movies" placeholder="输入目录路径">
-            <button class="btn btn-primary" onclick="refreshFiles()">🔄 扫描</button>
+        <div class="nav">
+            <button class="active" id="btn-dashboard" onclick="showPage('dashboard')">📊 仪表盘</button>
+            <button id="btn-files" onclick="showPage('files')">📁 文件</button>
+            <button id="btn-convert" onclick="showPage('convert')">🚀 转换</button>
+            <button id="btn-logs" onclick="showPage('logs')">📋 日志</button>
         </div>
         
-        <div class="card">
-            <h2>📋 文件列表 (<span id="file-count">0</span>个文件)</h2>
-            <div id="file-tree" style="margin-top: 15px;">
-                <div style="color: #8b949e; text-align: center; padding: 20px;">点击「扫描」加载文件</div>
+        <div id="page-dashboard" class="page active">
+            <div class="card">
+                <h2>📊 统计信息</h2>
+                <div class="stats">
+                    <div class="stat"><div class="stat-value" id="success-count">0</div><div>已转换</div></div>
+                    <div class="stat"><div class="stat-value" id="pending-count">0</div><div>待转换</div></div>
+                    <div class="stat"><div class="stat-value" id="failed-count">0</div><div>失败</div></div>
+                    <div class="stat"><div class="stat-value" id="total-count">0</div><div>总数</div></div>
+                </div>
+            </div>
+            <div class="card">
+                <h2>⚡ 快捷操作</h2>
+                <button class="btn" onclick="showPage('files'); refreshFiles();">📁 扫描文件</button>
+                <button class="btn" onclick="showPage('convert');">🚀 开始转换</button>
+                <button class="btn" onclick="showPage('logs');">📋 查看日志</button>
             </div>
         </div>
         
-        <div class="card">
-            <h2>📄 文件详情</h2>
-            <div id="file-detail" style="margin-top: 15px;">
-                <div style="color: #8b949e; text-align: center; padding: 20px;">👈 从列表中选择一个文件</div>
+        <div id="page-files" class="page">
+            <div class="card">
+                <h2>📂 扫描目录</h2>
+                <input type="text" id="scan-dir" value="/workspace/test_movies">
+                <button class="btn" onclick="refreshFiles();">🔄 扫描</button>
+            </div>
+            <div class="card">
+                <h2>📋 文件列表 (<span id="file-count">0</span>)</h2>
+                <div id="file-tree"></div>
+            </div>
+            <div class="card">
+                <h2>📄 文件详情</h2>
+                <div id="file-detail"></div>
             </div>
         </div>
-    </div>
-    
-    <div id="page-convert" class="page">
-        <div class="card">
-            <h2>⚙️ 转换设置</h2>
-            <input type="text" id="convert-dir" value="/workspace/test_movies" placeholder="目录路径">
-            <div style="margin: 15px 0;">
-                <label><input type="checkbox" id="overwrite"> 覆盖已有VSMETA</label>
+        
+        <div id="page-convert" class="page">
+            <div class="card">
+                <h2>⚙️ 转换设置</h2>
+                <input type="text" id="convert-dir" value="/workspace/test_movies">
+                <button class="btn" id="start-btn" onclick="startConversion();">▶️ 开始转换</button>
+                <button class="btn" id="stop-btn" onclick="stopConversion();" style="display:none;">⏹️ 停止</button>
             </div>
-            <button id="btn-start" class="btn btn-primary" onclick="startConversion()">▶️ 开始转换</button>
-            <button id="btn-stop" class="btn btn-danger" style="background: #f87171; display: none;" onclick="stopConversion()">⏹️ 停止</button>
         </div>
-    </div>
-    
-    <div id="page-logs" class="page">
-        <div class="card">
-            <h2>📋 运行日志</h2>
-            <button class="btn btn-secondary" onclick="refreshLogs()">🔄 刷新</button>
-            <button class="btn btn-secondary" onclick="clearLogs()">🗑️ 清空</button>
-            <div id="log-box" class="log-box" style="margin-top: 15px;">暂无日志</div>
+        
+        <div id="page-logs" class="page">
+            <div class="card">
+                <h2>📋 运行日志</h2>
+                <button class="btn" onclick="refreshLogs();">🔄 刷新</button>
+                <button class="btn" onclick="clearLogs();">🗑️ 清空</button>
+                <div id="log-box" style="background:#1e1e1e;color:#d4d4d4;padding:15px;margin-top:15px;max-height:400px;overflow-y:auto;font-family:monospace;border-radius:5px;"></div>
+            </div>
         </div>
     </div>
     
     <script>
-        let scanResults = [];
+        let files = [];
         
         function showPage(name) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -187,82 +160,66 @@ INDEX_HTML = '''
                 const resp = await fetch(url, opts);
                 return await resp.json();
             } catch (e) {
-                console.error('API error:', e);
+                console.error('Error:', e);
                 return {};
             }
         }
         
         async function refreshFiles() {
             const dir = document.getElementById('scan-dir').value;
-            document.getElementById('file-tree').innerHTML = '<div style="color: #8b949e; text-align: center; padding: 20px;">正在扫描...</div>';
-            
-            try {
-                const data = await api('/api/scan?dir=' + encodeURIComponent(dir));
-                scanResults = data.files || [];
-                renderFileTree();
-                await refreshStats();
-            } catch (e) {
-                console.error(e);
-            }
+            document.getElementById('file-tree').innerHTML = '<p>扫描中...</p>';
+            const data = await api('/api/scan?dir=' + encodeURIComponent(dir));
+            files = data.files || [];
+            renderFiles();
+            refreshStats();
         }
         
-        function renderFileTree() {
-            const container = document.getElementById('file-tree');
+        function renderFiles() {
+            const tree = document.getElementById('file-tree');
             const count = document.getElementById('file-count');
+            count.textContent = files.length;
             
-            if (!scanResults.length) {
-                container.innerHTML = '<div style="color: #8b949e; text-align: center; padding: 20px;">未找到视频文件</div>';
-                count.textContent = '0';
+            if (files.length === 0) {
+                tree.innerHTML = '<p>未找到文件</p>';
                 return;
             }
             
-            count.textContent = scanResults.length;
-            container.innerHTML = scanResults.map((file, idx) => 
-                '<div class="tree-item" onclick="selectFile(' + idx + ')" id="file-' + idx + '">' +
-                    '<span>🎬 ' + file.name + '</span>' +
-                    '<span class="badge badge-' + file.statusClass + '">' + file.statusText + '</span>' +
+            tree.innerHTML = files.map((f, i) => 
+                '<div class="file-item" onclick="showDetail(' + i + ')">' +
+                '<span>🎬 ' + f.name + '</span>' +
+                '<span class="badge ' + f.statusClass + '">' + f.statusText + '</span>' +
                 '</div>'
             ).join('');
         }
         
-        async function selectFile(index) {
-            document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('selected'));
-            document.getElementById('file-' + index).classList.add('selected');
-            
-            const file = scanResults[index];
-            const data = await api('/api/file-detail?path=' + encodeURIComponent(file.path));
-            
-            document.getElementById('file-detail').innerHTML = 
-                '<div style="background: #0f3460; padding: 15px; border-radius: 8px;">' +
-                    '<p><strong>文件名：</strong>' + (data.name || '-') + '</p>' +
-                    '<p><strong>NFO：</strong>' + (data.hasNfo ? '✅ 存在' : '❌ 缺失') + '</p>' +
-                    '<p><strong>VSMETA：</strong>' + (data.hasVsmeta ? '✅ 存在' : '⏳ 缺失') + '</p>' +
-                    '<p><strong>封面：</strong>' + (data.hasPoster ? '✅ 存在' : '⏳ 缺失') + '</p>' +
-                    '<p><strong>背景图：</strong>' + (data.hasFanart ? '✅ 存在' : '⏳ 缺失') + '</p>' +
-                '</div>';
+        function showDetail(index) {
+            const file = files[index];
+            const detail = document.getElementById('file-detail');
+            detail.innerHTML = 
+                '<p><strong>文件名：</strong>' + file.name + '</p>' +
+                '<p><strong>NFO：</strong>' + (file.hasNfo ? '✅ 存在' : '❌ 缺失') + '</p>' +
+                '<p><strong>VSMETA：</strong>' + (file.hasVsmeta ? '✅ 存在' : '⏳ 缺失') + '</p>' +
+                '<p><strong>目录：</strong>' + file.dir + '</p>';
         }
         
         async function refreshStats() {
             const data = await api('/api/status');
             const p = data.progress || {};
+            document.getElementById('success-count').textContent = p.success || 0;
+            document.getElementById('pending-count').textContent = Math.max(0, (p.total || 0) - (p.completed || 0));
+            document.getElementById('failed-count').textContent = p.failed || 0;
+            document.getElementById('total-count').textContent = p.total || 0;
             
-            const total = p.total || 0;
-            const completed = p.completed || 0;
-            const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-            
-            document.getElementById('progress-fill').style.width = pct + '%';
-            document.getElementById('progress-text').textContent = pct === 100 ? '转换完成！' : (p.currentFile || '等待中...');
-            
-            const btnStart = document.getElementById('btn-start');
-            const btnStop = document.getElementById('btn-stop');
-            if (btnStart) btnStart.style.display = data.is_running ? 'none' : 'inline-block';
-            if (btnStop) btnStop.style.display = data.is_running ? 'inline-block' : 'none';
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            if (startBtn) startBtn.style.display = data.is_running ? 'none' : 'inline-block';
+            if (stopBtn) stopBtn.style.display = data.is_running ? 'inline-block' : 'none';
         }
         
         async function startConversion() {
-            await api('/api/convert/start', 'POST', {
-                dir: document.getElementById('convert-dir').value
-            });
+            const dir = document.getElementById('convert-dir').value;
+            await api('/api/convert/start', 'POST', {dir: dir});
+            alert('转换已开始');
         }
         
         async function stopConversion() {
@@ -272,26 +229,26 @@ INDEX_HTML = '''
         async function refreshLogs() {
             const data = await api('/api/logs');
             const logs = data.logs || [];
-            
-            const container = document.getElementById('log-box');
-            if (!logs.length) {
-                container.innerHTML = '<div>暂无日志</div>';
+            const box = document.getElementById('log-box');
+            if (logs.length === 0) {
+                box.innerHTML = '<p>暂无日志</p>';
                 return;
             }
-            
-            container.innerHTML = logs.map(log => 
-                '<div>[<span style="color: #8b949e;">' + log.time + '</span>] ' +
-                '[<strong>' + log.level + '</strong>] ' + log.message + '</div>'
+            box.innerHTML = logs.map(l => 
+                '<div style="margin:5px 0;padding:5px;background:rgba(255,255,255,0.05);">' +
+                '[' + l.time + '] <strong>[' + l.level + ']</strong> ' + l.message +
+                '</div>'
             ).join('');
         }
         
         async function clearLogs() {
             await api('/api/logs', 'DELETE');
-            document.getElementById('log-box').innerHTML = '<div>暂无日志</div>';
+            document.getElementById('log-box').innerHTML = '<p>暂无日志</p>';
         }
         
         setInterval(refreshStats, 2000);
         refreshStats();
+        refreshLogs();
     </script>
 </body>
 </html>
@@ -325,6 +282,13 @@ def api_scan():
 def api_file_detail():
     path = request.args.get('path', '')
     return jsonify(get_file_detail(path))
+
+
+@app.route('/api/image/<path:filepath>')
+def api_image(filepath):
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'File not found'}), 404
+    return send_file(filepath)
 
 
 @app.route('/api/logs', methods=['GET', 'DELETE'])
@@ -470,6 +434,26 @@ def get_file_detail(filepath):
     nfo_path = base + '.nfo'
     vsmeta_path = base + '.vsmeta'
     
+    nfo_content = ''
+    if os.path.exists(nfo_path):
+        try:
+            with open(nfo_path, 'r', encoding='utf-8', errors='replace') as f:
+                nfo_content = f.read(10000)
+        except:
+            nfo_content = '无法读取NFO文件'
+    
+    vsmeta_content = ''
+    if os.path.exists(vsmeta_path):
+        try:
+            with open(vsmeta_path, 'rb') as f:
+                raw = f.read(4096)
+                try:
+                    vsmeta_content = raw.decode('utf-8', errors='replace')
+                except:
+                    vsmeta_content = '[二进制文件]'
+        except:
+            vsmeta_content = '无法读取VSMETA文件'
+    
     poster_extensions = ['.jpg', '.jpeg', '.png', '.tbn']
     fanart_extensions = ['.jpg', '.jpeg', '.png']
     
@@ -495,13 +479,25 @@ def get_file_detail(filepath):
                 fanart_path = os.path.join(os.path.dirname(filepath), 'fanart' + ext)
                 break
     
+    poster_url = None
+    if poster_path:
+        poster_url = f'/api/image/{os.path.abspath(poster_path)}'
+    
+    fanart_url = None
+    if fanart_path:
+        fanart_url = f'/api/image/{os.path.abspath(fanart_path)}'
+    
     return {
         'name': os.path.basename(filepath),
         'dir': os.path.dirname(filepath),
         'hasNfo': os.path.exists(nfo_path),
         'hasVsmeta': os.path.exists(vsmeta_path),
         'hasPoster': poster_path is not None,
-        'hasFanart': fanart_path is not None
+        'hasFanart': fanart_path is not None,
+        'nfoContent': nfo_content,
+        'vsmetaContent': vsmeta_content,
+        'posterUrl': poster_url,
+        'fanartUrl': fanart_url
     }
 
 
