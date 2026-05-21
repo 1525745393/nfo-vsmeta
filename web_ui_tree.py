@@ -704,6 +704,10 @@ INDEX_HTML = """
                         <input type="checkbox" id="recursive" checked>
                         <label for="recursive">递归扫描子目录</label>
                     </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="use-zhconv" checked>
+                        <label for="use-zhconv">🔤 简繁转换</label>
+                    </div>
                 </div>
                 
                 <div style="margin-top: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border-left: 4px solid var(--primary);">
@@ -714,7 +718,8 @@ INDEX_HTML = """
                         • <strong>重试延迟</strong>：重试间隔时间（秒），默认1秒<br>
                         • <strong>图片压缩</strong>：海报图片最大大小，超过则自动压缩<br>
                         • <strong>覆盖文件</strong>：重新转换已存在的VSMETA文件<br>
-                        • <strong>递归扫描</strong>：扫描所有子目录中的视频文件
+                        • <strong>递归扫描</strong>：扫描所有子目录中的视频文件<br>
+                        • <strong>简繁转换</strong>：自动转换简繁体中文，需安装zhconv库
                     </div>
                 </div>
                 
@@ -1355,7 +1360,8 @@ INDEX_HTML = """
                 retryDelay: parseInt(document.getElementById('retry-delay').value) || 1,
                 maxImageSize: parseInt(document.getElementById('max-image-size').value) || 500,
                 overwrite: document.getElementById('overwrite').checked,
-                recursive: document.getElementById('recursive').checked
+                recursive: document.getElementById('recursive').checked,
+                useZhconv: document.getElementById('use-zhconv').checked
             };
             
             if (confirm('确定要开始转换吗？')) {
@@ -1590,6 +1596,7 @@ def api_convert_start():
     max_image_size = data.get('maxImageSize', 500)
     overwrite = data.get('overwrite', False)
     recursive = data.get('recursive', True)
+    enable_chinese_conversion = data.get('useZhconv', True)
     
     _state['is_running'] = True
     _state['progress']['completed'] = 0
@@ -1599,7 +1606,7 @@ def api_convert_start():
     
     threading.Thread(
         target=run_conversion_cli, 
-        args=(directory, workers, retry_attempts, retry_delay, max_image_size, overwrite, recursive),
+        args=(directory, workers, retry_attempts, retry_delay, max_image_size, overwrite, recursive, enable_chinese_conversion),
         daemon=True
     ).start()
     return jsonify({'success': True})
@@ -1612,7 +1619,7 @@ def api_convert_stop():
     return jsonify({'success': True})
 
 
-def run_conversion_cli(directory, workers=4, retry_attempts=3, retry_delay=1, max_image_size=500, overwrite=False, recursive=True):
+def run_conversion_cli(directory, workers=4, retry_attempts=3, retry_delay=1, max_image_size=500, overwrite=False, recursive=True, enable_chinese_conversion=True):
     try:
         cmd = [
             sys.executable,
@@ -1630,6 +1637,7 @@ config.retry_delay = ''' + str(retry_delay) + '''
 config.max_image_size_kb = ''' + str(max_image_size) + '''
 config.overwrite = ''' + ('True' if overwrite else 'False') + '''
 config.recursive = ''' + ('True' if recursive else 'False') + '''
+config.enable_chinese_conversion = ''' + ('True' if enable_chinese_conversion else 'False') + '''
 
 converter = NFOToVSMETAConverter(config)
 files = converter.file_scanner.scan()
