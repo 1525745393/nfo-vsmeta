@@ -1628,8 +1628,8 @@ config.max_workers = ''' + str(workers) + '''
 config.retry_attempts = ''' + str(retry_attempts) + '''
 config.retry_delay = ''' + str(retry_delay) + '''
 config.max_image_size_kb = ''' + str(max_image_size) + '''
-config.overwrite = ''' + str(overwrite).lower() + '''
-config.recursive = ''' + str(recursive).lower() + '''
+config.overwrite = ''' + ('True' if overwrite else 'False') + '''
+config.recursive = ''' + ('True' if recursive else 'False') + '''
 
 converter = NFOToVSMETAConverter(config)
 files = converter.file_scanner.scan()
