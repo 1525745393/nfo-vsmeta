@@ -40,9 +40,9 @@ jobs:
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
-        body_path: CHANGELOG.md
         files: dist/*
         generate_release_notes: true
+        draft: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
